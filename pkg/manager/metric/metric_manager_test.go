@@ -3,6 +3,7 @@ package metric
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/cache"
 	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/clients/pi"
 	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/models"
 	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/testutils"
@@ -36,7 +38,7 @@ func TestNewMetricManager(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			manager, _ := NewMetricManager(tc.mockPiService, testutils.CreateDefaultParsedTestConfig())
+			manager, _ := NewMetricManager(tc.mockPiService, testutils.CreateDefaultParsedTestConfig(), testutils.TestRegion)
 
 			assert.NotNil(t, manager)
 			assert.Equal(t, tc.mockPiService, manager.piService)
@@ -97,7 +99,7 @@ func TestGetMetricBatches(t *testing.T) {
 			instance := tc.instanceFactory()
 
 			mockPI := &mocks.MockPIService{}
-			manager, _ := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig())
+			manager, _ := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig(), testutils.TestRegion)
 
 			if tc.shouldCallList {
 				mockPI.On("ListAvailableResourceMetrics", mock.Anything, instance.ResourceID).
@@ -155,7 +157,7 @@ func TestCollectMetricsForBatch(t *testing.T) {
 			instance := tc.instanceFactory()
 
 			mockPI := &mocks.MockPIService{}
-			manager, _ := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig())
+			manager, _ := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig(), testutils.TestRegion)
 
 			mockPI.On("GetResourceMetrics", mock.Anything, instance.ResourceID, tc.metricsBatch).
 				Return(tc.mockGetResponse, tc.getError)
@@ -213,7 +215,7 @@ func TestCollectMetricsForBatchWithEmptyResponse(t *testing.T) {
 			instance := tc.instanceFactory()
 
 			mockPI := &mocks.MockPIService{}
-			manager, _ := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig())
+			manager, _ := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig(), testutils.TestRegion)
 
 			mockPI.On("GetResourceMetrics", mock.Anything, instance.ResourceID, tc.metricsBatch).
 				Return(tc.mockGetResponse, nil)
@@ -245,7 +247,7 @@ func TestGetMetricBatchesWithNilMetrics(t *testing.T) {
 	}
 
 	mockPI := &mocks.MockPIService{}
-	manager, _ := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig())
+	manager, _ := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig(), testutils.TestRegion)
 
 	batches, err := manager.GetMetricBatches(context.Background(), instance)
 
@@ -292,7 +294,7 @@ func TestGetMetrics(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockPI := &mocks.MockPIService{}
-			manager, _ := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig())
+			manager, _ := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig(), testutils.TestRegion)
 
 			if tc.shouldCallAPI {
 				mockPI.On("ListAvailableResourceMetrics", mock.Anything, tc.resourceID).
@@ -327,7 +329,7 @@ func TestGetAvailableMetrics(t *testing.T) {
 			resourceID:    "db-TESTPOSTGRES",
 			mockResponse:  mocks.NewMockPIListMetricsResponse(),
 			expectedError: nil,
-			expectedCount: 5,
+			expectedCount: 6, // 5 from mock + 1 db.load added automatically
 		},
 		{
 			name:          "LisAvailableResourceMetrics error",
@@ -341,7 +343,7 @@ func TestGetAvailableMetrics(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockPI := &mocks.MockPIService{}
-			manager, _ := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig())
+			manager, _ := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig(), testutils.TestRegion)
 
 			mockPI.On("ListAvailableResourceMetrics", mock.Anything, tc.resourceID).
 				Return(tc.mockResponse, tc.expectedError)
@@ -414,18 +416,22 @@ func TestGetMetricData(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockPI := &mocks.MockPIService{}
-			manager, _ := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig())
+			manager, _ := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig(), testutils.TestRegion)
 
 			mockPI.On("GetResourceMetrics", mock.Anything, tc.resourceID, tc.metricNames).
 				Return(tc.mockResponse, tc.expectedError)
 
-			metricData, err := manager.getMetricData(context.Background(), tc.resourceID, tc.metricNames)
+			metricDataResult, err := manager.getMetricData(context.Background(), tc.resourceID, tc.metricNames)
 
 			if tc.expectedError != nil {
 				assert.Error(t, err)
-				assert.Nil(t, metricData)
+				assert.Nil(t, metricDataResult)
 			} else {
 				assert.NoError(t, err)
+				assert.NotNil(t, metricDataResult)
+				
+				// Filter to get the actual metric data
+				metricData := manager.filterLatestValidMetricData(metricDataResult)
 				assert.Len(t, metricData, tc.expectedCount)
 
 				for _, data := range metricData {
@@ -466,7 +472,7 @@ func TestFilterLatestValidMetricData(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockPI := &mocks.MockPIService{}
-			manager, _ := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig())
+			manager, _ := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig(), testutils.TestRegion)
 
 			filtered := manager.filterLatestValidMetricData(tc.mockResponse)
 
@@ -642,7 +648,7 @@ func TestGetLatestValidDataPoint(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockPI := &mocks.MockPIService{}
-			manager, _ := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig())
+			manager, _ := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig(), testutils.TestRegion)
 
 			result := manager.getLatestValidDataPoint(tc.dataPoints)
 
@@ -653,6 +659,415 @@ func TestGetLatestValidDataPoint(t *testing.T) {
 				assert.NotNil(t, result.Value)
 				assert.NotNil(t, result.Timestamp)
 				assert.Equal(t, *tc.expectedValue, *result.Value)
+			}
+		})
+	}
+}
+
+// Unit tests for cache integration
+
+func TestCacheIntegration_EndToEndFlow(t *testing.T) {
+	testCases := []struct {
+		name                string
+		numMetrics          int
+		numCached           int
+		expectedFetchCount  int
+		expectedCachedCount int
+	}{
+		{
+			name:                "All metrics cached",
+			numMetrics:          5,
+			numCached:           5,
+			expectedFetchCount:  0,
+			expectedCachedCount: 5,
+		},
+		{
+			name:                "No metrics cached",
+			numMetrics:          5,
+			numCached:           0,
+			expectedFetchCount:  5,
+			expectedCachedCount: 0,
+		},
+		{
+			name:                "Partial cache hit",
+			numMetrics:          5,
+			numCached:           3,
+			expectedFetchCount:  2,
+			expectedCachedCount: 3,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			instance := testutils.NewTestInstancePostgreSQL()
+			mockPI := &mocks.MockPIService{}
+			manager, err := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig(), testutils.TestRegion)
+			assert.NoError(t, err)
+
+			// Create metric names
+			metricNames := make([]string, tc.numMetrics)
+			for i := 0; i < tc.numMetrics; i++ {
+				metricNames[i] = fmt.Sprintf("os.metric%d.avg", i)
+			}
+
+			// Pre-populate cache
+			now := time.Now()
+			for i := 0; i < tc.numCached; i++ {
+				cacheKey := cache.CacheKey{
+
+					Instance:   instance.Identifier,
+					MetricName: metricNames[i],
+					Statistic:  "avg",
+				}
+				manager.metricDataCache.Set(cacheKey, float64(i*10), now, 10*time.Minute)
+			}
+
+			// Test filterCachedMetrics
+			metricsToFetch, cachedMetrics := manager.filterCachedMetrics(instance, metricNames)
+
+			assert.Equal(t, tc.expectedFetchCount, len(metricsToFetch))
+			assert.Equal(t, tc.expectedCachedCount, len(cachedMetrics))
+		})
+	}
+}
+
+func TestCacheIntegration_PatternBasedTTL(t *testing.T) {
+	// Create config with pattern-based TTL
+	config := testutils.CreateDefaultParsedTestConfig()
+	config.Discovery.Metrics.DataCachePatterns = []models.ParsedPatternTTL{
+		{
+			Pattern: "os\\..*",
+			TTL:     1 * time.Minute,
+		},
+		{
+			Pattern: "db\\..*",
+			TTL:     5 * time.Minute,
+		},
+	}
+
+	instance := testutils.NewTestInstancePostgreSQL()
+	mockPI := &mocks.MockPIService{}
+	manager, err := NewMetricManager(mockPI, config, testutils.TestRegion)
+	assert.NoError(t, err)
+
+	// Test OS metric gets 1 minute TTL from pattern
+	osMetric := models.MetricData{
+		Metric:    "os.cpuUtilization.avg",
+		Timestamp: time.Now(),
+		Value:     50.0,
+	}
+	// Pattern should match, but provide fallback dynamic TTL just in case
+	manager.updateCacheWithDynamicTTL(instance, osMetric, 30*time.Second)
+
+	osCacheKey := cache.CacheKey{
+
+		Instance:   instance.Identifier,
+		MetricName: osMetric.Metric,
+		Statistic:  "avg",
+	}
+	osEntry, found := manager.metricDataCache.Get(osCacheKey)
+	assert.True(t, found)
+	assert.Equal(t, osMetric.Value, osEntry.Value)
+
+	// Test DB metric gets 5 minute TTL from pattern
+	dbMetric := models.MetricData{
+		Metric:    "db.load.avg",
+		Timestamp: time.Now(),
+		Value:     100.0,
+	}
+	// Pattern should match, but provide fallback dynamic TTL just in case
+	manager.updateCacheWithDynamicTTL(instance, dbMetric, 30*time.Second)
+
+	dbCacheKey := cache.CacheKey{
+
+		Instance:   instance.Identifier,
+		MetricName: dbMetric.Metric,
+		Statistic:  "avg",
+	}
+	dbEntry, found := manager.metricDataCache.Get(dbCacheKey)
+	assert.True(t, found)
+	assert.Equal(t, dbMetric.Value, dbEntry.Value)
+
+	// Verify TTLs are different (DB should expire later than OS)
+	assert.True(t, dbEntry.ExpiresAt.After(osEntry.ExpiresAt))
+}
+
+func TestCacheIntegration_ExtractStatistic(t *testing.T) {
+	testCases := []struct {
+		name               string
+		metricNameWithStat string
+		expectedStatistic  string
+	}{
+		{
+			name:               "Extract avg statistic",
+			metricNameWithStat: "os.cpuUtilization.avg",
+			expectedStatistic:  "avg",
+		},
+		{
+			name:               "Extract min statistic",
+			metricNameWithStat: "db.load.min",
+			expectedStatistic:  "min",
+		},
+		{
+			name:               "Extract max statistic",
+			metricNameWithStat: "os.memory.max",
+			expectedStatistic:  "max",
+		},
+		{
+			name:               "Extract sum statistic",
+			metricNameWithStat: "db.transactions.sum",
+			expectedStatistic:  "sum",
+		},
+		{
+			name:               "No statistic suffix",
+			metricNameWithStat: "os.cpuUtilization",
+			expectedStatistic:  "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockPI := &mocks.MockPIService{}
+			manager, err := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig(), testutils.TestRegion)
+			assert.NoError(t, err)
+
+			result := manager.extractStatistic(tc.metricNameWithStat)
+
+			assert.Equal(t, tc.expectedStatistic, result)
+		})
+	}
+}
+
+func TestCollectMetricsForBatch_WithCache(t *testing.T) {
+	testCases := []struct {
+		name                string
+		metricsBatch        []string
+		numCached           int
+		mockGetResponse     *awspi.GetResourceMetricsOutput
+		expectedMetricCount int
+	}{
+		{
+			name:                "All metrics from cache",
+			metricsBatch:        testutils.TestMetricNamesWithStatsSmall,
+			numCached:           2,
+			mockGetResponse:     nil,
+			expectedMetricCount: 2,
+		},
+		{
+			name:                "No metrics from cache",
+			metricsBatch:        testutils.TestMetricNamesWithStatsSmall,
+			numCached:           0,
+			mockGetResponse:     mocks.NewMockPIGetResourceMetricsResponseSmall(),
+			expectedMetricCount: 2,
+		},
+		{
+			name:                "Partial cache hit",
+			metricsBatch:        testutils.TestMetricNamesWithStats[:3],
+			numCached:           1,
+			mockGetResponse:     mocks.NewMockPIGetResourceMetricsResponseSmall(),
+			expectedMetricCount: 3,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			instance := testutils.NewTestInstancePostgreSQL()
+			mockPI := &mocks.MockPIService{}
+			manager, err := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig(), testutils.TestRegion)
+			assert.NoError(t, err)
+
+			// Pre-populate cache
+			now := time.Now()
+			for i := 0; i < tc.numCached; i++ {
+				cacheKey := cache.CacheKey{
+
+					Instance:   instance.Identifier,
+					MetricName: tc.metricsBatch[i],
+					Statistic:  "avg",
+				}
+				manager.metricDataCache.Set(cacheKey, float64(i*10), now, 10*time.Minute)
+			}
+
+			// Setup mock only if we need to fetch
+			if tc.numCached < len(tc.metricsBatch) {
+				metricsToFetch := tc.metricsBatch[tc.numCached:]
+				mockPI.On("GetResourceMetrics", mock.Anything, instance.ResourceID, metricsToFetch).
+					Return(tc.mockGetResponse, nil)
+			}
+
+			ch := make(chan prometheus.Metric, 100)
+			err = manager.CollectMetricsForBatch(context.Background(), instance, tc.metricsBatch, ch)
+
+			assert.NoError(t, err)
+			close(ch)
+
+			metricCount := 0
+			for range ch {
+				metricCount++
+			}
+			assert.Equal(t, tc.expectedMetricCount, metricCount)
+
+			mockPI.AssertExpectations(t)
+		})
+	}
+}
+
+// TestCalculateDynamicTTL tests the dynamic TTL calculation from datapoints
+func TestCalculateDynamicTTL(t *testing.T) {
+	testCases := []struct {
+		name        string
+		dataPoints  []pitypes.DataPoint
+		expectedTTL time.Duration
+	}{
+		{
+			name: "Two valid datapoints with 1 second difference",
+			dataPoints: []pitypes.DataPoint{
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)), Value: aws.Float64(10.0)},
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 1, 0, time.UTC)), Value: aws.Float64(11.0)},
+			},
+			expectedTTL: 1 * time.Second,
+		},
+		{
+			name: "Two valid datapoints with 60 second difference",
+			dataPoints: []pitypes.DataPoint{
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)), Value: aws.Float64(10.0)},
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 1, 0, 0, time.UTC)), Value: aws.Float64(11.0)},
+			},
+			expectedTTL: 60 * time.Second,
+		},
+		{
+			name: "Multiple datapoints - uses last two valid",
+			dataPoints: []pitypes.DataPoint{
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)), Value: aws.Float64(10.0)},
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 1, 0, time.UTC)), Value: aws.Float64(11.0)},
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 2, 0, time.UTC)), Value: aws.Float64(12.0)},
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 3, 0, time.UTC)), Value: aws.Float64(13.0)},
+			},
+			expectedTTL: 1 * time.Second, // Difference between last two
+		},
+		{
+			name: "Only one valid datapoint",
+			dataPoints: []pitypes.DataPoint{
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)), Value: aws.Float64(10.0)},
+			},
+			expectedTTL: 0, // Can't calculate with only 1 datapoint
+		},
+		{
+			name:        "No valid datapoints",
+			dataPoints:  []pitypes.DataPoint{},
+			expectedTTL: 0,
+		},
+		{
+			name: "Datapoints with nil values - skips to find valid ones",
+			dataPoints: []pitypes.DataPoint{
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)), Value: aws.Float64(10.0)},
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 1, 0, time.UTC)), Value: nil},
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 2, 0, time.UTC)), Value: aws.Float64(12.0)},
+			},
+			expectedTTL: 2 * time.Second, // Difference between index 2 and index 0
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockPI := &mocks.MockPIService{}
+			manager, err := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig(), testutils.TestRegion)
+			assert.NoError(t, err)
+
+			// Extract the latest 2 valid datapoints first (matching the optimized implementation)
+			validDataPoints := manager.getLatestNValidDataPoints(tc.dataPoints, 2)
+			ttl := manager.calculateDynamicTTL(validDataPoints)
+			assert.Equal(t, tc.expectedTTL, ttl)
+		})
+	}
+}
+
+// TestGetLatestNValidDataPoints tests the optimized function for extracting N most recent valid datapoints
+func TestGetLatestNValidDataPoints(t *testing.T) {
+	testCases := []struct {
+		name           string
+		dataPoints     []pitypes.DataPoint
+		n              int
+		expectedCount  int
+		expectedFirst  *time.Time // Most recent timestamp
+		expectedSecond *time.Time // Second most recent timestamp
+	}{
+		{
+			name: "Extract 2 valid datapoints from array with 4",
+			dataPoints: []pitypes.DataPoint{
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)), Value: aws.Float64(10.0)},
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 1, 0, time.UTC)), Value: aws.Float64(11.0)},
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 2, 0, time.UTC)), Value: aws.Float64(12.0)},
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 3, 0, time.UTC)), Value: aws.Float64(13.0)},
+			},
+			n:              2,
+			expectedCount:  2,
+			expectedFirst:  aws.Time(time.Date(2026, 1, 1, 12, 0, 3, 0, time.UTC)), // Most recent
+			expectedSecond: aws.Time(time.Date(2026, 1, 1, 12, 0, 2, 0, time.UTC)), // Second most recent
+		},
+		{
+			name: "Extract 1 valid datapoint",
+			dataPoints: []pitypes.DataPoint{
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)), Value: aws.Float64(10.0)},
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 1, 0, time.UTC)), Value: aws.Float64(11.0)},
+			},
+			n:             1,
+			expectedCount: 1,
+			expectedFirst: aws.Time(time.Date(2026, 1, 1, 12, 0, 1, 0, time.UTC)),
+		},
+		{
+			name: "Skip nil values and extract valid ones",
+			dataPoints: []pitypes.DataPoint{
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)), Value: aws.Float64(10.0)},
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 1, 0, time.UTC)), Value: nil},
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 2, 0, time.UTC)), Value: aws.Float64(12.0)},
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 3, 0, time.UTC)), Value: nil},
+			},
+			n:              2,
+			expectedCount:  2,
+			expectedFirst:  aws.Time(time.Date(2026, 1, 1, 12, 0, 2, 0, time.UTC)),
+			expectedSecond: aws.Time(time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)),
+		},
+		{
+			name: "Request more than available",
+			dataPoints: []pitypes.DataPoint{
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)), Value: aws.Float64(10.0)},
+			},
+			n:             5,
+			expectedCount: 1,
+			expectedFirst: aws.Time(time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)),
+		},
+		{
+			name:          "Empty datapoints array",
+			dataPoints:    []pitypes.DataPoint{},
+			n:             2,
+			expectedCount: 0,
+		},
+		{
+			name: "Request 0 datapoints",
+			dataPoints: []pitypes.DataPoint{
+				{Timestamp: aws.Time(time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)), Value: aws.Float64(10.0)},
+			},
+			n:             0,
+			expectedCount: 0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockPI := &mocks.MockPIService{}
+			manager, err := NewMetricManager(mockPI, testutils.CreateDefaultParsedTestConfig(), testutils.TestRegion)
+			assert.NoError(t, err)
+
+			result := manager.getLatestNValidDataPoints(tc.dataPoints, tc.n)
+			assert.Equal(t, tc.expectedCount, len(result))
+
+			if tc.expectedCount > 0 && tc.expectedFirst != nil {
+				assert.Equal(t, *tc.expectedFirst, *result[0].Timestamp)
+			}
+
+			if tc.expectedCount > 1 && tc.expectedSecond != nil {
+				assert.Equal(t, *tc.expectedSecond, *result[1].Timestamp)
 			}
 		})
 	}

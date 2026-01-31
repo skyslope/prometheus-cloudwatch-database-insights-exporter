@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/pi/types"
 	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/models"
 )
@@ -91,6 +92,17 @@ func BuildMetricDefinitionMap(availableMetrics []types.ResponseResourceMetric, m
 	if len(availableMetrics) == 0 {
 		return nil, fmt.Errorf("[METRIC UTILS] NO metrics provided to build")
 	}
+
+	// Add db.load metric to the available metrics since AWS API doesn't return it
+	// but it's available for querying via GetResourceMetrics
+	dbLoadMetric := types.ResponseResourceMetric{
+		Metric:      aws.String("db.load"),
+		Description: aws.String("Database load (DB load) measures the level of session activity in your database"),
+		Unit:        aws.String("Average Active Sessions"),
+	}
+	
+	// Prepend db.load to available metrics
+	availableMetrics = append([]types.ResponseResourceMetric{dbLoadMetric}, availableMetrics...)
 
 	metricDefinitionMap := make(map[string]models.MetricDetails, len(availableMetrics))
 	engineRegistry := registry.GetEngineRegistry(engine)

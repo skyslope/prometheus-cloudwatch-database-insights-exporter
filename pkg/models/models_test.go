@@ -931,7 +931,6 @@ func TestParsedInstancesConfigWithFilter(t *testing.T) {
 			name: "with nil filter includes everything",
 			config: ParsedInstancesConfig{
 				MaxInstances: 25,
-				InstanceTTL:  5 * time.Minute,
 				Filter:       nil,
 			},
 			instance: Instance{
@@ -960,9 +959,8 @@ func TestParsedMetricsConfigWithFilter(t *testing.T) {
 		{
 			name: "with nil filter includes everything",
 			config: ParsedMetricsConfig{
-				Statistic:   StatisticAvg,
-				MetadataTTL: 60 * time.Minute,
-				Filter:      nil,
+				Statistic: StatisticAvg,
+				Filter:    nil,
 			},
 			metricDetails: MetricDetails{
 				Name:        "os.cpuUtilization.idle",

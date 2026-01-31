@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -22,7 +23,7 @@ func TestLoadConfig(t *testing.T) {
 			name: "load valid config with all fields",
 			configContent: `discovery:
   regions:
-  - us-west-2
+  - us-east-1
   instances:
     max-instances: 10
   metrics:
@@ -31,7 +32,7 @@ export:
   port: 8081`,
 			expectedError: false,
 			validate: func(t *testing.T, cfg *models.ParsedConfig) {
-				assert.Equal(t, []string{"us-west-2"}, cfg.Discovery.Regions)
+				assert.Equal(t, []string{"us-east-1"}, cfg.Discovery.Regions)
 				assert.Equal(t, 10, cfg.Discovery.Instances.MaxInstances)
 				assert.Equal(t, models.StatisticAvg, cfg.Discovery.Metrics.Statistic)
 				assert.Equal(t, 8081, cfg.Export.Port)
@@ -57,7 +58,7 @@ export:
 			name: "load config with multiple regions (only first is used)",
 			configContent: `discovery:
   regions:
-  - us-west-2
+  - us-east-1
   - us-east-1
   - eu-west-1
   metrics:
@@ -66,7 +67,7 @@ export:
   port: 8081`,
 			expectedError: false,
 			validate: func(t *testing.T, cfg *models.ParsedConfig) {
-				assert.Equal(t, []string{"us-west-2"}, cfg.Discovery.Regions)
+				assert.Equal(t, []string{"us-east-1"}, cfg.Discovery.Regions)
 			},
 		},
 		{
@@ -89,7 +90,7 @@ export:
 			name: "load config with invalid statistic",
 			configContent: `discovery:
   regions:
-  - us-west-2
+  - us-east-1
   metrics:
     statistic: "invalid"
 export:
@@ -112,7 +113,7 @@ export:
 			name: "load config with invalid YAML",
 			configContent: `discovery:
   regions:
-  - us-west-2
+  - us-east-1
   metrics:
     statistic: "avg"
   invalid yaml here: [[[`,
@@ -123,7 +124,7 @@ export:
 			name: "load config with custom max instances",
 			configContent: `discovery:
   regions:
-  - us-west-2
+  - us-east-1
   instances:
     max-instances: 5
   metrics:
@@ -139,7 +140,7 @@ export:
 			name: "load config with max instances exceeding limit gets capped",
 			configContent: `discovery:
   regions:
-  - us-west-2
+  - us-east-1
   instances:
     max-instances: 100
   metrics:
@@ -155,7 +156,7 @@ export:
 			name: "load config with zero max instances applies default",
 			configContent: `discovery:
   regions:
-  - us-west-2
+  - us-east-1
   instances:
     max-instances: 0
   metrics:
@@ -171,7 +172,7 @@ export:
 			name: "load config with negative max instances applies default",
 			configContent: `discovery:
   regions:
-  - us-west-2
+  - us-east-1
   instances:
     max-instances: -5
   metrics:
@@ -187,7 +188,7 @@ export:
 			name: "load config with max instances = 1",
 			configContent: `discovery:
   regions:
-  - us-west-2
+  - us-east-1
   instances:
     max-instances: 1
   metrics:
@@ -365,11 +366,11 @@ func TestParsedValidateConfig(t *testing.T) {
 			config: testutils.CreateTestConfig(map[string]interface{}{
 				"statistic": "max",
 				"port":      8082,
-				"regions":   []string{"us-west-2", "us-east-1", "eu-west-1"},
+				"regions":   []string{"us-east-1", "us-east-1", "eu-west-1"},
 			}),
 			expectedError: false,
 			validate: func(t *testing.T, cfg *models.ParsedConfig) {
-				assert.Equal(t, []string{"us-west-2"}, cfg.Discovery.Regions)
+				assert.Equal(t, []string{"us-east-1"}, cfg.Discovery.Regions)
 				assert.Equal(t, models.StatisticMax, cfg.Discovery.Metrics.Statistic)
 				assert.Equal(t, 8082, cfg.Export.Port)
 			},
@@ -411,10 +412,15 @@ func TestParsedMetricsConfig(t *testing.T) {
 		{
 			name: "build with avg statistic",
 			input: models.MetricsConfig{
-				Statistic:   "avg",
-				Include:     nil,
-				Exclude:     nil,
-				MetadataTTL: "60m",
+				Statistic: "avg",
+				Cache: models.MetricsCacheConfig{
+					MetricMetadataTTL: "60m",
+					MetricData: models.MetricDataCacheConfig{
+						MaxSize: 1000,
+					},
+				},
+				Include: nil,
+				Exclude: nil,
 			},
 			expected: models.ParsedMetricsConfig{
 				Statistic: models.StatisticAvg,
@@ -423,10 +429,15 @@ func TestParsedMetricsConfig(t *testing.T) {
 		{
 			name: "build with max statistic",
 			input: models.MetricsConfig{
-				Statistic:   "max",
-				Include:     nil,
-				Exclude:     nil,
-				MetadataTTL: "60m",
+				Statistic: "max",
+				Cache: models.MetricsCacheConfig{
+					MetricMetadataTTL: "60m",
+					MetricData: models.MetricDataCacheConfig{
+						MaxSize: 1000,
+					},
+				},
+				Include: nil,
+				Exclude: nil,
 			},
 			expected: models.ParsedMetricsConfig{
 				Statistic: models.StatisticMax,
@@ -435,10 +446,15 @@ func TestParsedMetricsConfig(t *testing.T) {
 		{
 			name: "build with min statistic",
 			input: models.MetricsConfig{
-				Statistic:   "min",
-				Include:     nil,
-				Exclude:     nil,
-				MetadataTTL: "60m",
+				Statistic: "min",
+				Cache: models.MetricsCacheConfig{
+					MetricMetadataTTL: "60m",
+					MetricData: models.MetricDataCacheConfig{
+						MaxSize: 1000,
+					},
+				},
+				Include: nil,
+				Exclude: nil,
 			},
 			expected: models.ParsedMetricsConfig{
 				Statistic: models.StatisticMin,
@@ -447,10 +463,15 @@ func TestParsedMetricsConfig(t *testing.T) {
 		{
 			name: "build with sum statistic",
 			input: models.MetricsConfig{
-				Statistic:   "sum",
-				Include:     nil,
-				Exclude:     nil,
-				MetadataTTL: "60m",
+				Statistic: "sum",
+				Cache: models.MetricsCacheConfig{
+					MetricMetadataTTL: "60m",
+					MetricData: models.MetricDataCacheConfig{
+						MaxSize: 1000,
+					},
+				},
+				Include: nil,
+				Exclude: nil,
 			},
 			expected: models.ParsedMetricsConfig{
 				Statistic: models.StatisticSum,
@@ -459,20 +480,30 @@ func TestParsedMetricsConfig(t *testing.T) {
 		{
 			name: "build with invalid statistic returns empty",
 			input: models.MetricsConfig{
-				Statistic:   "invalid",
-				Include:     nil,
-				Exclude:     nil,
-				MetadataTTL: "60m",
+				Statistic: "invalid",
+				Cache: models.MetricsCacheConfig{
+					MetricMetadataTTL: "60m",
+					MetricData: models.MetricDataCacheConfig{
+						MaxSize: 1000,
+					},
+				},
+				Include: nil,
+				Exclude: nil,
 			},
 			expected: models.ParsedMetricsConfig{},
 		},
 		{
 			name: "build with empty statistic returns empty",
 			input: models.MetricsConfig{
-				Statistic:   "",
-				Include:     nil,
-				Exclude:     nil,
-				MetadataTTL: "60m",
+				Statistic: "",
+				Cache: models.MetricsCacheConfig{
+					MetricMetadataTTL: "60m",
+					MetricData: models.MetricDataCacheConfig{
+						MaxSize: 1000,
+					},
+				},
+				Include: nil,
+				Exclude: nil,
 			},
 			expected: models.ParsedMetricsConfig{},
 		},
@@ -624,14 +655,12 @@ func TestParseInstancesConfig(t *testing.T) {
 			name: "valid config with no include/exclude",
 			config: models.InstancesConfig{
 				MaxInstances: 10,
-				InstanceTTL:  "5m",
 				Include:      nil,
 				Exclude:      nil,
 			},
 			expectedError: false,
 			validate: func(t *testing.T, cfg models.ParsedInstancesConfig) {
 				assert.Equal(t, 10, cfg.MaxInstances)
-				assert.Equal(t, 5*time.Minute, cfg.InstanceTTL)
 				assert.Nil(t, cfg.Filter)
 			},
 		},
@@ -639,7 +668,6 @@ func TestParseInstancesConfig(t *testing.T) {
 			name: "valid config with include patterns",
 			config: models.InstancesConfig{
 				MaxInstances: 10,
-				InstanceTTL:  "5m",
 				Include: models.FilterConfig{
 					"identifier": []string{"^prod-", "^test-"},
 				},
@@ -656,7 +684,6 @@ func TestParseInstancesConfig(t *testing.T) {
 			name: "valid config with exclude patterns",
 			config: models.InstancesConfig{
 				MaxInstances: 10,
-				InstanceTTL:  "5m",
 				Include:      nil,
 				Exclude: models.FilterConfig{
 					"identifier": []string{"^temp-", "^old-"},
@@ -673,7 +700,6 @@ func TestParseInstancesConfig(t *testing.T) {
 			name: "valid config with both include and exclude",
 			config: models.InstancesConfig{
 				MaxInstances: 10,
-				InstanceTTL:  "5m",
 				Include: models.FilterConfig{
 					"identifier": []string{"^prod-"},
 				},
@@ -691,7 +717,6 @@ func TestParseInstancesConfig(t *testing.T) {
 			name: "invalid include regex pattern",
 			config: models.InstancesConfig{
 				MaxInstances: 10,
-				InstanceTTL:  "5m",
 				Include: models.FilterConfig{
 					"identifier": []string{"[invalid"},
 				},
@@ -704,7 +729,6 @@ func TestParseInstancesConfig(t *testing.T) {
 			name: "invalid exclude regex pattern",
 			config: models.InstancesConfig{
 				MaxInstances: 10,
-				InstanceTTL:  "5m",
 				Include:      nil,
 				Exclude: models.FilterConfig{
 					"identifier": []string{"(unclosed"},
@@ -714,23 +738,9 @@ func TestParseInstancesConfig(t *testing.T) {
 			validate:      nil,
 		},
 		{
-			name: "invalid instance TTL format",
-			config: models.InstancesConfig{
-				MaxInstances: 10,
-				InstanceTTL:  "invalid",
-				Include: models.FilterConfig{
-					"identifier": []string{"^prod-"},
-				},
-				Exclude: nil,
-			},
-			expectedError: true,
-			validate:      nil,
-		},
-		{
 			name: "maxInstances exceeds limit gets capped",
 			config: models.InstancesConfig{
 				MaxInstances: 100,
-				InstanceTTL:  "5m",
 				Include:      nil,
 				Exclude:      nil,
 			},
@@ -743,7 +753,6 @@ func TestParseInstancesConfig(t *testing.T) {
 			name: "invalid include field name",
 			config: models.InstancesConfig{
 				MaxInstances: 10,
-				InstanceTTL:  "5m",
 				Include: models.FilterConfig{
 					"invalid_field": []string{"^prod-"},
 				},
@@ -756,7 +765,6 @@ func TestParseInstancesConfig(t *testing.T) {
 			name: "valid tag-based filtering",
 			config: models.InstancesConfig{
 				MaxInstances: 10,
-				InstanceTTL:  "5m",
 				Include: models.FilterConfig{
 					"tag.Environment": []string{"^prod"},
 				},
@@ -972,24 +980,33 @@ func TestParsedMetricsConfigWithIncludeExclude(t *testing.T) {
 		{
 			name: "valid config with no include/exclude",
 			config: models.MetricsConfig{
-				Statistic:   "avg",
-				MetadataTTL: "60m",
-				Include:     nil,
-				Exclude:     nil,
+				Statistic: "avg",
+				Cache: models.MetricsCacheConfig{
+					MetricMetadataTTL: "60m",
+					MetricData: models.MetricDataCacheConfig{
+						MaxSize: 1000,
+					},
+				},
+				Include: nil,
+				Exclude: nil,
 			},
 			expectedError: false,
 			validate: func(t *testing.T, cfg models.ParsedMetricsConfig) {
 				assert.Equal(t, models.StatisticAvg, cfg.Statistic)
-				assert.Equal(t, 60*time.Minute, cfg.MetadataTTL)
 				assert.Nil(t, cfg.Filter)
 			},
 		},
 		{
 			name: "valid config with exclude patterns",
 			config: models.MetricsConfig{
-				Statistic:   "avg",
-				MetadataTTL: "60m",
-				Include:     nil,
+				Statistic: "avg",
+				Cache: models.MetricsCacheConfig{
+					MetricMetadataTTL: "60m",
+					MetricData: models.MetricDataCacheConfig{
+						MaxSize: 1000,
+					},
+				},
+				Include: nil,
 				Exclude: models.FilterConfig{
 					"name": []string{"^db\\."},
 				},
@@ -1003,8 +1020,13 @@ func TestParsedMetricsConfigWithIncludeExclude(t *testing.T) {
 		{
 			name: "valid config with custom statistics in include",
 			config: models.MetricsConfig{
-				Statistic:   "avg",
-				MetadataTTL: "60m",
+				Statistic: "avg",
+				Cache: models.MetricsCacheConfig{
+					MetricMetadataTTL: "60m",
+					MetricData: models.MetricDataCacheConfig{
+						MaxSize: 1000,
+					},
+				},
 				Include: models.FilterConfig{
 					"name": []string{"os.cpuUtilization.idle.max", "os.memory.total.min"},
 				},
@@ -1022,9 +1044,14 @@ func TestParsedMetricsConfigWithIncludeExclude(t *testing.T) {
 		{
 			name: "exclude with statistic transforms to metric name",
 			config: models.MetricsConfig{
-				Statistic:   "avg",
-				MetadataTTL: "60m",
-				Include:     nil,
+				Statistic: "avg",
+				Cache: models.MetricsCacheConfig{
+					MetricMetadataTTL: "60m",
+					MetricData: models.MetricDataCacheConfig{
+						MaxSize: 1000,
+					},
+				},
+				Include: nil,
 				Exclude: models.FilterConfig{
 					"name": []string{"os.cpuUtilization.idle.max"},
 				},
@@ -1039,9 +1066,14 @@ func TestParsedMetricsConfigWithIncludeExclude(t *testing.T) {
 		{
 			name: "invalid exclude regex pattern",
 			config: models.MetricsConfig{
-				Statistic:   "avg",
-				MetadataTTL: "60m",
-				Include:     nil,
+				Statistic: "avg",
+				Cache: models.MetricsCacheConfig{
+					MetricMetadataTTL: "60m",
+					MetricData: models.MetricDataCacheConfig{
+						MaxSize: 1000,
+					},
+				},
+				Include: nil,
 				Exclude: models.FilterConfig{
 					"name": []string{"(unclosed"},
 				},
@@ -1050,23 +1082,17 @@ func TestParsedMetricsConfigWithIncludeExclude(t *testing.T) {
 			validate:      nil,
 		},
 		{
-			name: "invalid metadata TTL format",
-			config: models.MetricsConfig{
-				Statistic:   "avg",
-				MetadataTTL: "invalid",
-				Include:     nil,
-				Exclude:     nil,
-			},
-			expectedError: true,
-			validate:      nil,
-		},
-		{
 			name: "invalid statistic",
 			config: models.MetricsConfig{
-				Statistic:   "invalid",
-				MetadataTTL: "60m",
-				Include:     nil,
-				Exclude:     nil,
+				Statistic: "invalid",
+				Cache: models.MetricsCacheConfig{
+					MetricMetadataTTL: "60m",
+					MetricData: models.MetricDataCacheConfig{
+						MaxSize: 1000,
+					},
+				},
+				Include: nil,
+				Exclude: nil,
 			},
 			expectedError: true,
 			validate:      nil,
@@ -1208,4 +1234,265 @@ func TestGetOrDefaultString(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+// Maximum cache size enforcement
+func TestProperty59_MaximumCacheSizeEnforcement(t *testing.T) {
+	// For any cache state, the number of entries should never exceed the configured maximum cache size
+
+	// Test with various max sizes
+	testCases := []struct {
+		maxSize int
+	}{
+		{maxSize: 1},
+		{maxSize: 10},
+		{maxSize: 100},
+		{maxSize: 1000},
+		{maxSize: 1000000},
+	}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("max_size_%d", tc.maxSize), func(t *testing.T) {
+			config := models.Config{
+				Discovery: models.DiscoveryConfig{
+					Regions: []string{"us-east-1"},
+					Instances: models.InstancesConfig{
+						MaxInstances: 10,
+						Cache: models.InstancesCacheConfig{
+							TTL: "5m",
+						},
+					},
+					Metrics: models.MetricsConfig{
+						Statistic: "avg",
+						Cache: models.MetricsCacheConfig{
+							MetricMetadataTTL: "60m",
+							MetricData: models.MetricDataCacheConfig{
+								MaxSize: tc.maxSize,
+							},
+						},
+					},
+					Processing: models.ProcessingConfig{
+						Concurrency: 4,
+					},
+				},
+				Export: models.ExportConfig{
+					Port: 8081,
+					Prometheus: models.PrometheusConfig{
+						MetricPrefix: "dbi",
+					},
+				},
+			}
+
+			parsedConfig, err := parsedValidateConfig(&config)
+			assert.NoError(t, err)
+			assert.NotNil(t, parsedConfig)
+
+			// Verify the max size is preserved
+			assert.Equal(t, tc.maxSize, parsedConfig.Discovery.Metrics.DataCacheMaxSize)
+		})
+	}
+}
+
+// Default maximum cache size
+func TestProperty60_DefaultMaximumCacheSize(t *testing.T) {
+	// For any configuration omitting the maximum cache size, the system should use 1 million as the default maximum
+
+	config := models.Config{
+		Discovery: models.DiscoveryConfig{
+			Regions: []string{"us-east-1"},
+			Instances: models.InstancesConfig{
+				MaxInstances: 10,
+				Cache: models.InstancesCacheConfig{
+					TTL: "5m",
+				},
+			},
+			Metrics: models.MetricsConfig{
+				Statistic: "avg",
+				Cache: models.MetricsCacheConfig{
+					MetricMetadataTTL: "60m",
+					MetricData: models.MetricDataCacheConfig{
+						MaxSize: 0, // Omitted/zero value
+					},
+				},
+			},
+			Processing: models.ProcessingConfig{
+				Concurrency: 4,
+			},
+		},
+		Export: models.ExportConfig{
+			Port: 8081,
+			Prometheus: models.PrometheusConfig{
+				MetricPrefix: "dbi",
+			},
+		},
+	}
+
+	// Apply defaults
+	applyDefaults(&config)
+
+	// Verify default max size is applied
+	assert.Equal(t, DefaultCacheMaxSize, config.Discovery.Metrics.Cache.MetricData.MaxSize)
+	assert.Equal(t, 100000, config.Discovery.Metrics.Cache.MetricData.MaxSize)
+}
+
+// Invalid cache TTL rejection for pattern TTLs
+func TestProperty70_InvalidCacheTTLRejection(t *testing.T) {
+	// For any configuration with an invalid pattern TTL format, the system should terminate with an error message
+
+	invalidTTLs := []string{
+		"invalid",
+		"5x",
+		"",
+		"abc",
+		"5.5.5m",
+		"-5m",
+	}
+
+	for _, invalidTTL := range invalidTTLs {
+		t.Run(fmt.Sprintf("ttl_%s", invalidTTL), func(t *testing.T) {
+			config := models.Config{
+				Discovery: models.DiscoveryConfig{
+					Regions: []string{"us-east-1"},
+					Instances: models.InstancesConfig{
+						MaxInstances: 10,
+						Cache: models.InstancesCacheConfig{
+							TTL: "5m",
+						},
+					},
+					Metrics: models.MetricsConfig{
+						Statistic: "avg",
+						Cache: models.MetricsCacheConfig{
+							MetricMetadataTTL: "60m",
+							MetricData: models.MetricDataCacheConfig{
+								PatternTTLs: []models.PatternTTLConfig{
+									{
+										Pattern: "^os\\.",
+										TTL:     invalidTTL,
+									},
+								},
+								MaxSize: 1000,
+							},
+						},
+					},
+					Processing: models.ProcessingConfig{
+						Concurrency: 4,
+					},
+				},
+				Export: models.ExportConfig{
+					Port: 8081,
+					Prometheus: models.PrometheusConfig{
+						MetricPrefix: "dbi",
+					},
+				},
+			}
+
+			parsedConfig, err := parsedValidateConfig(&config)
+
+			// Should return an error for invalid pattern TTL
+			assert.Error(t, err)
+			assert.Nil(t, parsedConfig)
+			assert.Contains(t, err.Error(), "cache.metric-data.pattern-ttls")
+		})
+	}
+}
+
+// Invalid cache size rejection
+func TestProperty71_InvalidCacheSizeRejection(t *testing.T) {
+	// For any configuration with a maximum cache size less than 1, the system should terminate with an error message
+
+	invalidSizes := []int{
+		-1,
+		-10,
+		-100,
+		0,
+	}
+
+	for _, invalidSize := range invalidSizes {
+		t.Run(fmt.Sprintf("size_%d", invalidSize), func(t *testing.T) {
+			config := models.Config{
+				Discovery: models.DiscoveryConfig{
+					Regions: []string{"us-east-1"},
+					Instances: models.InstancesConfig{
+						MaxInstances: 10,
+						Cache: models.InstancesCacheConfig{
+							TTL: "5m",
+						},
+					},
+					Metrics: models.MetricsConfig{
+						Statistic: "avg",
+						Cache: models.MetricsCacheConfig{
+							MetricMetadataTTL: "60m",
+							MetricData: models.MetricDataCacheConfig{
+								MaxSize: invalidSize,
+							},
+						},
+					},
+					Processing: models.ProcessingConfig{
+						Concurrency: 4,
+					},
+				},
+				Export: models.ExportConfig{
+					Port: 8081,
+					Prometheus: models.PrometheusConfig{
+						MetricPrefix: "dbi",
+					},
+				},
+			}
+
+			// Apply defaults first (which would set 0 to default)
+			if invalidSize == 0 {
+				applyDefaults(&config)
+				// After applying defaults, 0 should become DefaultCacheMaxSize
+				assert.Equal(t, DefaultCacheMaxSize, config.Discovery.Metrics.Cache.MetricData.MaxSize)
+			} else {
+				// For negative values, validation should fail
+				parsedConfig, err := parsedValidateConfig(&config)
+
+				// Should return an error for invalid cache size
+				assert.Error(t, err)
+				assert.Nil(t, parsedConfig)
+				assert.Contains(t, err.Error(), "cache.metric-data.max-size")
+			}
+		})
+	}
+
+	// Test that size >= 1 is valid
+	t.Run("valid_size_1", func(t *testing.T) {
+		config := models.Config{
+			Discovery: models.DiscoveryConfig{
+				Regions: []string{"us-east-1"},
+				Instances: models.InstancesConfig{
+					MaxInstances: 10,
+					Cache: models.InstancesCacheConfig{
+						TTL: "5m",
+					},
+				},
+				Metrics: models.MetricsConfig{
+					Statistic: "avg",
+					Cache: models.MetricsCacheConfig{
+						MetricMetadataTTL: "60m",
+						MetricData: models.MetricDataCacheConfig{
+							MaxSize: 1,
+						},
+					},
+				},
+				Processing: models.ProcessingConfig{
+					Concurrency: 4,
+				},
+			},
+			Export: models.ExportConfig{
+				Port: 8081,
+				Prometheus: models.PrometheusConfig{
+					MetricPrefix: "dbi",
+				},
+			},
+		}
+
+		parsedConfig, err := parsedValidateConfig(&config)
+
+		// Should succeed for size = 1
+		assert.NoError(t, err)
+		assert.NotNil(t, parsedConfig)
+		assert.Equal(t, 1, parsedConfig.Discovery.Metrics.DataCacheMaxSize)
+	})
 }

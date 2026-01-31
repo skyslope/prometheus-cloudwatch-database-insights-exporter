@@ -27,6 +27,7 @@ type RDSInstanceManager struct {
 	Instances            []models.Instance
 	InstancesLastUpdated time.Time
 	InstanceTTL          time.Duration
+	MetadataTTL          time.Duration
 	configuration        *models.ParsedConfig
 }
 
@@ -47,7 +48,8 @@ func NewRDSInstanceManager(rds rds.RDSService, config *models.ParsedConfig) (*RD
 	}
 	return &RDSInstanceManager{
 		rdsService:    rds,
-		InstanceTTL:   config.Discovery.Instances.InstanceTTL,
+		InstanceTTL:   config.Discovery.Instances.CacheTTL,
+		MetadataTTL:   config.Discovery.Metrics.MetadataCacheTTL,
 		configuration: config,
 	}, nil
 }
@@ -59,6 +61,10 @@ func (instanceManager *RDSInstanceManager) GetInstances(ctx context.Context) ([]
 	}
 
 	if instanceManager.Instances == nil || instanceManager.InstancesLastUpdated.IsZero() || time.Now().After(instanceManager.InstancesLastUpdated.Add(instanceManager.InstanceTTL)) {
+		if utils.IsDebugEnabled() {
+			log.Printf("[DEBUG] Instance-Discovery Cache Expired, fetching new instance list from AWS RDS")
+		}
+
 		instances, err := instanceManager.discoverInstances(ctx)
 		if err != nil {
 			return nil, err
@@ -73,6 +79,10 @@ func (instanceManager *RDSInstanceManager) GetInstances(ctx context.Context) ([]
 			instanceManager.Instances = instances
 		}
 		instanceManager.InstancesLastUpdated = time.Now()
+
+		if utils.IsDebugEnabled() {
+			log.Printf("[DEBUG] Instance-Discovery Cache Updated, cached %d instances", len(instanceManager.Instances))
+		}
 	}
 
 	return instanceManager.Instances, nil
@@ -113,7 +123,7 @@ func (instanceManager *RDSInstanceManager) discoverInstances(ctx context.Context
 				CreationTime: instanceFields.InstanceCreateTime,
 				Tags:         tags,
 				Metrics: &models.Metrics{
-					MetadataTTL: instanceManager.configuration.Discovery.Metrics.MetadataTTL,
+					MetadataTTL: instanceManager.MetadataTTL,
 				},
 			}
 		}

@@ -7,7 +7,8 @@ discovery:
   
   instances:
     max-instances: 25
-    ttl: "5m"
+    cache:
+      ttl: "5m"
     
     # Include instances based on field patterns
     include:
@@ -42,9 +43,7 @@ discovery:
         - "true"
   
   metrics:
-    statistic: "avg"
-    metadata-ttl: "60m"
-    
+    statistic: "avg"    
     include:
       category:
         - "os"
@@ -56,6 +55,22 @@ discovery:
     exclude:
       name:
         - "test"
+
+    cache:
+      metric-metadata-ttl: "60m"    # How long to cache metric definitions per instance
+      metric-data:
+        max-size: 100000            # Maximum number of metric values to cache
+        # Optional: Pattern-based TTL overrides for specific metrics
+        # Patterns match against metric names: <metric-name-with-statistic>
+        # Examples: "db.load.avg", "os.memory.total.avg"
+        # If pattern TTL is smaller than the metric's data interval (dynamic TTL),
+        # the dynamic TTL will be used instead to respect the actual metric granularity.
+        # If no pattern matches, TTL is calculated dynamically from metric collection interval
+        pattern-ttls:
+          - pattern: "^db\\.load\\..*"        # Match db.load metrics (any statistic)
+            ttl: "30s"
+          - pattern: "^os\\.memory\\..*"      # Match os.memory metrics (any statistic)
+            ttl: "5m"
   
   processing:
     concurrency: 4

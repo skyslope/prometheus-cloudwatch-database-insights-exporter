@@ -382,11 +382,13 @@ func (b *TestConfigBuilder) Build() *models.ParsedConfig {
 			Regions: b.regions,
 			Instances: models.ParsedInstancesConfig{
 				MaxInstances: b.maxInstances,
-				InstanceTTL:  b.instanceTTL,
+				CacheTTL:     b.instanceTTL,
 			},
 			Metrics: models.ParsedMetricsConfig{
-				Statistic:   b.statistic,
-				MetadataTTL: b.metadataTTL,
+				Statistic:         b.statistic,
+				MetadataCacheTTL:  b.metadataTTL,
+				DataCacheMaxSize:  1000000,
+				DataCachePatterns: []models.ParsedPatternTTL{},
 			},
 			Processing: models.ParsedProcessingConfig{
 				Concurrency: b.concurrency,
@@ -415,11 +417,18 @@ func CreateTestConfig(overrides ...map[string]interface{}) *models.Config {
 			Regions: []string{"us-west-2"},
 			Instances: models.InstancesConfig{
 				MaxInstances: TestMaxInstances,
-				InstanceTTL:  "5m",
+				Cache: models.InstancesCacheConfig{
+					TTL: "5m",
+				},
 			},
 			Metrics: models.MetricsConfig{
-				Statistic:   "avg",
-				MetadataTTL: "60m",
+				Statistic: "avg",
+				Cache: models.MetricsCacheConfig{
+					MetricMetadataTTL: "60m",
+					MetricData: models.MetricDataCacheConfig{
+						MaxSize: 1000000,
+					},
+				},
 			},
 		},
 		Export: models.ExportConfig{

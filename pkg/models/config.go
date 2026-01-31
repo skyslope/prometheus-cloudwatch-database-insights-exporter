@@ -24,17 +24,26 @@ type ExportConfig struct {
 }
 
 type InstancesConfig struct {
-	MaxInstances int          `yaml:"max-instances"`
-	InstanceTTL  string       `yaml:"ttl"`
-	Include      FilterConfig `yaml:"include,omitempty"`
-	Exclude      FilterConfig `yaml:"exclude,omitempty"`
+	MaxInstances int                `yaml:"max-instances"`
+	Cache        InstancesCacheConfig `yaml:"cache,omitempty"`
+	Include      FilterConfig       `yaml:"include,omitempty"`
+	Exclude      FilterConfig       `yaml:"exclude,omitempty"`
+}
+
+type InstancesCacheConfig struct {
+	TTL string `yaml:"ttl"`
 }
 
 type MetricsConfig struct {
-	Statistic   string
-	MetadataTTL string       `yaml:"metadata-ttl"`
-	Include     FilterConfig `yaml:"include,omitempty"`
-	Exclude     FilterConfig `yaml:"exclude,omitempty"`
+	Statistic string
+	Cache     MetricsCacheConfig `yaml:"cache,omitempty"`
+	Include   FilterConfig       `yaml:"include,omitempty"`
+	Exclude   FilterConfig       `yaml:"exclude,omitempty"`
+}
+
+type MetricsCacheConfig struct {
+	MetricMetadataTTL string                `yaml:"metric-metadata-ttl"`
+	MetricData        MetricDataCacheConfig `yaml:"metric-data"`
 }
 
 type ProcessingConfig struct {
@@ -43,6 +52,17 @@ type ProcessingConfig struct {
 
 type PrometheusConfig struct {
 	MetricPrefix string `yaml:"metric-prefix"`
+}
+
+type MetricDataCacheConfig struct {
+	DefaultTTL  string             `yaml:"default-ttl,omitempty"`
+	PatternTTLs []PatternTTLConfig `yaml:"pattern-ttls,omitempty"`
+	MaxSize     int                `yaml:"max-size"`
+}
+
+type PatternTTLConfig struct {
+	Pattern string `yaml:"pattern"`
+	TTL     string `yaml:"ttl"`
 }
 
 type FilterConfig map[string][]string
@@ -66,16 +86,18 @@ type ParsedExportConfig struct {
 
 type ParsedInstancesConfig struct {
 	MaxInstances int `yaml:"max-instances"`
-	InstanceTTL  time.Duration
+	CacheTTL     time.Duration
 	Filter       filter.Filter
 }
 
 type ParsedMetricsConfig struct {
-	Statistic   Statistic
-	MetadataTTL time.Duration `yaml:"metadata-ttl"`
-	Filter      filter.Filter
-	Include     FilterConfig
-	Exclude     FilterConfig
+	Statistic         Statistic
+	MetadataCacheTTL  time.Duration
+	DataCacheMaxSize  int
+	DataCachePatterns []ParsedPatternTTL
+	Filter            filter.Filter
+	Include           FilterConfig
+	Exclude           FilterConfig
 }
 
 type ParsedProcessingConfig struct {
@@ -84,6 +106,11 @@ type ParsedProcessingConfig struct {
 
 type ParsedPrometheusConfig struct {
 	MetricPrefix string `yaml:"metric-prefix"`
+}
+
+type ParsedPatternTTL struct {
+	Pattern string
+	TTL     time.Duration
 }
 
 func (instanceConfig *ParsedInstancesConfig) ShouldIncludeInstance(instance filter.Filterable) bool {

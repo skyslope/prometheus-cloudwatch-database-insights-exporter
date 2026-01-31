@@ -41,11 +41,67 @@ As of Q4 2025, the exporter remains under active development. Current filtering 
    curl http://localhost:8081/metrics
    ```
 
+## Command-Line Flags
+
+The exporter supports the following command-line flags:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-config` | `config.yml` | Path to configuration file |
+| `-debug` | `false` | Enable debug logging for cache operations |
+
+**Examples**:
+```bash
+# Use default config.yml in current directory
+./dbinsights-exporter
+
+# Specify custom config file path
+./dbinsights-exporter -config /etc/dbinsights/my-config.yml
+
+# Enable debug mode
+./dbinsights-exporter -debug
+
+# Combine flags
+./dbinsights-exporter -config /path/to/config.yml -debug
+```
+
+## Debug Mode
+
+Enable debug logging to see detailed cache behavior including cache hits, misses, and expiration events:
+
+```bash
+# Enable debug mode with -debug flag
+./dbinsights-exporter -debug
+```
+
+**Debug logs include**:
+- Instance-Discovery Cache: Expiration and refresh events
+- Metric-Metadata Cache: Expiration and refresh events for each instance
+- Metric-Data Cache: Cache hits, misses, and updates for metric values
+
+**Example debug output**:
+```
+[MAIN] Debug mode enabled
+[MAIN] Loaded configuration from: config.yml
+[DEBUG] Instance-Discovery Cache Expired, fetching new instance list from AWS RDS
+[DEBUG] Instance-Discovery Cache Updated, cached 25 instances
+[DEBUG] Metric-Metadata Cache Expired for instance: prod-db-1, fetching new metric definitions from AWS
+[DEBUG] Metric-Metadata Cache Updated for instance: prod-db-1, cached 47 metrics
+[DEBUG] Metric-Data Cache Expired: instance=prod-db-2, expired_metrics=15/15, fetching from AWS
+[DEBUG] Metric-Data Cache Updated: instance=prod-db-2, new_entries=15
+```
+
 ## Configuration
 
-The DB Insights Exporter has a simple configuration mechanism using a YAML configuration file. Currently, no command-line flags are supported - all configuration is done through the `config.yml` file.
+The DB Insights Exporter uses a YAML configuration file for all settings. By default, it looks for `config.yml` in the current directory, but you can specify a custom path using the `-config` flag.
 
-The configuration file must be named `config.yml` and placed in the same directory as the executable.
+```bash
+# Use default config.yml
+./dbinsights-exporter
+
+# Use custom config file
+./dbinsights-exporter -config /path/to/my-config.yml
+```
 
 ## YAML Configuration File
 
@@ -58,7 +114,8 @@ discovery:
     - "us-west-2"
   instances:
     max-instances: 25
-    ttl: "5m"
+    cache:
+      ttl: "5m"
     include:
       identifier: ["^(prod|staging)-"]
       engine: ["^postgres", "aurora-postgresql"]
@@ -66,7 +123,15 @@ discovery:
       identifier: ["-temp-", "-test$"]
   metrics:
     statistic: "avg"
-    metadata-ttl: "1h"
+    cache:
+      metric-metadata-ttl: "60m"
+      metric-data:
+        max-size: 100000
+        pattern-ttls:
+          - pattern: ".*/db\\.load\\..*"
+            ttl: "1s"
+          - pattern: ".*/os\\.memory\\..*"
+            ttl: "10m"
     include:
       name: ["^(db|os)\\.", ".*\\.max$"]
       category: ["os", "db"]
@@ -90,11 +155,13 @@ Controls how the exporter discovers and monitors RDS/Aurora instances.
 |-------|------|------------------|---------|-------------|
 | `regions` | array | Required | `["us-west-2"]` | List of AWS regions to scan for RDS/Aurora instances. **Note**: Only the first region is currently used (single-region support only) |
 | `instances.max-instances` | integer | Optional | `25` | Maximum number of instances to monitor. When this limit is exceeded, only the oldest `max-instances` are selected |
-| `instances.ttl` | string | Optional | `"5m"` | Time-to-live for cached instance discovery results |
+| `instances.cache.ttl` | string | Optional | `"5m"` | Time-to-live for cached instance discovery results. How long to cache the list of RDS/Aurora instances before re-discovering |
 | `instances.include` | map | Optional | `{}` | Map of field names to regex pattern arrays for instance filtering (allowlist mode). Supported fields: `identifier`, `engine`, `tag.<TagKey>` (e.g., `tag.Environment`, `tag.Team`) |
 | `instances.exclude` | map | Optional | `{}` | Map of field names to regex pattern arrays for instance filtering (denylist mode). Supported fields: `identifier`, `engine`, `tag.<TagKey>` (e.g., `tag.Status`, `tag.Maintenance`) |
 | `metrics.statistic` | string | Required | `"avg"` | Default statistic aggregation for Performance Insights metrics |
-| `metrics.metadata-ttl` | string | Optional | `"60m"` | Time-to-live for cached metric definitions |
+| `metrics.cache.metric-metadata-ttl` | string | Optional | `"60m"` | Time-to-live for cached metric definitions. How long to cache the list of available metrics for each instance |
+| `metrics.cache.metric-data.max-size` | integer | Optional | `100000` | Maximum number of metric values to cache. When exceeded, oldest entries are evicted |
+| `metrics.cache.metric-data.pattern-ttls` | array | Optional | `[]` | Pattern-based TTL overrides for specific metrics. Patterns match against metric names (e.g., `db.load.avg`). If pattern TTL is smaller than the metric's data interval, the dynamic TTL will be used instead. If no pattern matches, TTL is calculated dynamically based on metric granularity |
 | `metrics.include` | map | Optional | `{}` | Map of field names to regex pattern arrays for metric filtering (allowlist mode). Supported fields: `name`, `category`, `unit` |
 | `metrics.exclude` | map | Optional | `{}` | Map of field names to regex pattern arrays for metric filtering (denylist mode). Supported fields: `name`, `category`, `unit` |
 | `processing.concurrency` | integer | Optional | `4` | Number of concurrent goroutines for metric collection |
@@ -119,16 +186,132 @@ Controls how metrics are exposed via HTTP endpoint.
 | `port` | integer | Required | `8081` | HTTP port number for the Prometheus metrics endpoint |
 | `prometheus.metric-prefix` | string | Optional | `"dbi_"` | Prefix added to all exported Prometheus metric names |
 
+**Pattern Format for TTL Overrides**:
+
+Patterns are regex expressions that match against metric names with statistics in the format:
+```
+<metric-name>.<statistic>
+```
+
+**Example metric names**:
+- `db.load.avg` - Database load average
+- `os.cpuUtilization.user.avg` - CPU user time average
+- `db.SQL.queries.sum` - SQL queries sum
+- `os.memory.total.max` - Memory total maximum
+
+**Example patterns**:
+- `^db\\.load\\..*` - Matches all `db.load` metrics (any statistic)
+- `^os\\.memory\\..*` - Matches all `os.memory` metrics
+- `^db\\.SQL\\..*\\.sum$` - Matches all `db.SQL` metrics with sum statistic
+- `.*\\.avg$` - Matches any metric with avg statistic
+- `^os\\.cpuUtilization\\.(user|system)\\..*` - Matches CPU user or system metrics
+
+**Pattern tips**:
+- Use `^` to match from the beginning of the metric name
+- Use `$` to match to the end (useful for matching specific statistics)
+- Use `\\.` to match literal dots in metric names
+- Use `.*` to match any characters
+- Patterns are evaluated in order - first match wins
+- If pattern TTL is smaller than the metric's actual data interval (dynamic TTL), the dynamic TTL will be used instead to respect metric granularity
+
+**Dynamic TTL Calculation**: When no pattern matches a metric, the system automatically calculates an appropriate TTL by:
+1. Examining the last two valid datapoints from the metric's 3-minute history
+2. Calculating the time difference between these datapoints
+3. Using this difference as the TTL (adapts to metric granularity automatically)
+
+This means per-second metrics (like `db.load`) get ~1s TTL, while per-minute metrics get ~60s TTL, without manual configuration.
+
+## Metric Data Caching Recommendations
+
+**IMPORTANT**: Understanding metric data caching behavior is critical for balancing API efficiency with data freshness.
+
+### When NOT to Configure Metric Data Cache
+
+**It is NOT recommended to configure metric data caching** if you need real-time, always-fresh data on every scrape. Without caching configured:
+- Every Prometheus scrape fetches the latest available datapoint from AWS Performance Insights
+- You always get the most recent metric value
+- Higher AWS API usage and costs
+- Potential for API throttling with many instances
+
+### When to Configure Metric Data Cache
+
+Configure caching when you want to:
+- Reduce AWS API calls and costs
+- Avoid API throttling when monitoring many instances
+- Accept some data staleness in exchange for efficiency
+
+### Critical Caching Behavior
+
+**Pattern TTL vs Dynamic TTL**:
+- If you configure a pattern TTL that is **smaller** than the metric's actual data interval (dynamic TTL), the system will automatically use the dynamic TTL instead
+- This prevents caching metrics for less time than their natural update interval
+- Example: If `os.cpuUtilization.total` updates every 10 second (dynamic TTL = 10s) but you set pattern TTL to 30s, the cache will use 30s
+- Example: If `os.cpuUtilization.total` updates every 10 second (dynamic TTL = 10s) but you set pattern TTL to 1s for a 1-second metric, the system will use 10s (dynamic TTL) instead
+
+**Data Staleness with Caching**:
+- When caching is enabled, cached values are served until the TTL expires
+- Maximum staleness equals the configured TTL duration
+- Example with 30s TTL for `db.load`:
+  - Scrape at T=0s: Fetch from AWS, cache with timestamp T=0s, expires at T=30s
+  - Scrape at T=15s: Serve cached value (timestamp T=0s) - data is 15s old
+  - Scrape at T=31s: Cache expired, fetch from AWS, get value with timestamp T=31s
+
+**Scrape Interval vs Cache TTL**:
+- If scrape interval > cache TTL: Most scrapes will be cache misses (fetching fresh data)
+- If scrape interval < cache TTL: Most scrapes will be cache hits (serving cached data)
+- If scrape interval = cache TTL: Balanced between fresh data and API efficiency
+
+### Configuration Recommendations
+
+**For Real-Time Monitoring** (scrape interval 15-30s):
+```yaml
+cache:
+  metric-data:
+    max-size: 100000
+    # Option 1: No pattern-ttls = always use dynamic TTL (adapts to metric granularity)
+    # Option 2: Short TTLs matching or slightly longer than scrape interval
+```
+
+### Best Practices
+
+1. **Start without caching** to understand your metric update patterns
+2. **Monitor AWS API usage** to determine if caching is needed
+3. **Set TTLs based on**:
+   - Your scrape interval
+   - Metric update frequency (per-second vs per-minute)
+   - Acceptable staleness for your use case
+4. **Use dynamic TTL** (no pattern-ttls) to automatically adapt to metric granularity
+5. **Set pattern TTLs** only when you need specific caching behavior different from the metric's natural interval
+
+**Metric Data Freshness & Staleness**:
+
+### Understanding Cache Expiration
+
+The metric data cache is designed to balance API efficiency with data freshness:
+
+- **Cache Expiration Based on Metric Timestamp**: Cache entries expire based on when the metric was measured (not when it was cached). This ensures consistent freshness regardless of fetch delays.
+
+- **Per-Second Metrics** (e.g., `db.load`):
+  - These metrics update every second in Performance Insights
+  - With dynamic TTL (~1s) or short pattern TTL, you always get recent data
+  - The cache stores the most recent measurement and serves it until the TTL expires
+  - After expiration, the next scrape fetches fresh data with the latest timestamp
+
+- **Per-Minute Metrics** (e.g., some database counters):
+  - These metrics update less frequently
+  - Dynamic TTL automatically adapts to ~60s based on datapoint intervals
+  - Reduces unnecessary API calls for metrics that don't change every second
+
 ### Minimal Configuration Example
 
 ```yaml
 discovery:
   regions:
-    - "us-east-1"
+    - "us-west-2"
 ```
 
 This minimal configuration will:
-- Monitor RDS/Aurora instances in `us-east-1`
+- Monitor RDS/Aurora instances in `us-west-2`
 - Use `avg` statistic for all metrics
 - Serve metrics on port `8081`
 
@@ -449,8 +632,17 @@ make coverage-html  # Generate test coverage report
 
 ### Running Locally
 ```bash
-# Direct execution
+# Direct execution (uses config.yml in current directory)
 ./dbinsights-exporter
+
+# With custom config file
+./dbinsights-exporter -config /path/to/my-config.yml
+
+# With debug logging
+./dbinsights-exporter -debug
+
+# Combine flags
+./dbinsights-exporter -config /etc/dbinsights/config.yml -debug
 
 # Check metrics endpoint
 curl http://localhost:8081/metrics

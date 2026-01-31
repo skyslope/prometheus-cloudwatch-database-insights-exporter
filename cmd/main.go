@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -22,12 +23,26 @@ const (
 )
 
 func main() {
+	// Parse command-line flags
+	configPath := flag.String("config", "config.yml", "Path to configuration file")
+	debugFlag := flag.Bool("debug", false, "Enable debug logging for cache operations")
+	flag.Parse()
+
+	// Set debug mode
+	utils.SetDebugEnabled(*debugFlag)
+
+	if *debugFlag {
+		log.Println("[MAIN] Debug mode enabled")
+	}
+
 	log.Println("[MAIN] Starting Database Insights Exporter")
 
-	cfg, err := utils.LoadConfig("config.yml")
+	cfg, err := utils.LoadConfig(*configPath)
 	if err != nil {
-		log.Fatalf("[MAIN] Error loading configuration: %v", err)
+		log.Fatalf("[MAIN] Error loading configuration from %s: %v", *configPath, err)
 	}
+
+	log.Printf("[MAIN] Loaded configuration from: %s", *configPath)
 
 	factory := region.NewRegionManagerFactory()
 	regionManager, err := factory.CreateRegionManager(cfg)

@@ -50,7 +50,7 @@ func (factory *RegionManagerFactory) createSingleRegionManager(region string, co
 		return nil, fmt.Errorf("failed to create RDS instance manager: %w", err)
 	}
 
-	metricManager, err := metric.NewMetricManager(piClient, config)
+	metricManager, err := metric.NewMetricManager(piClient, config, region)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create metric manager: %w", err)
 	}

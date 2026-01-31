@@ -246,3 +246,32 @@ func NewMockPIGetResourceMetricsResponseWithNilKeys() *pi.GetResourceMetricsOutp
 		},
 	}
 }
+
+func NewMockPIGetResourceMetricsResponseSmall() *pi.GetResourceMetricsOutput {
+	return &pi.GetResourceMetricsOutput{
+		MetricList: []pitypes.MetricKeyDataPoints{
+			{
+				Key: &pitypes.ResponseResourceMetricKey{
+					Metric: aws.String("os.cpuUtilization.guest.avg"),
+				},
+				DataPoints: []pitypes.DataPoint{
+					{
+						Timestamp: aws.Time(testutils.TestTimestamp),
+						Value:     aws.Float64(25.5),
+					},
+				},
+			},
+			{
+				Key: &pitypes.ResponseResourceMetricKey{
+					Metric: aws.String("os.cpuUtilization.idle.avg"),
+				},
+				DataPoints: []pitypes.DataPoint{
+					{
+						Timestamp: aws.Time(testutils.TestTimestamp),
+						Value:     aws.Float64(74.5),
+					},
+				},
+			},
+		},
+	}
+}

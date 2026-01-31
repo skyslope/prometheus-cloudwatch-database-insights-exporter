@@ -440,8 +440,13 @@ func TestBuildMetricDefinitionMap(t *testing.T) {
 			availableMetrics:    mocks.NewMockPIListMetricsResponse().Metrics,
 			metricConfig:        nil,
 			expectedError:       false,
-			expectedCount:       5,
+			expectedCount:       6, // 5 from mock + 1 db.load added automatically
 			validateResults: func(t *testing.T, result map[string]models.MetricDetails) {
+				// Verify db.load was added automatically
+				assert.Contains(t, result, "db.load")
+				assert.Equal(t, "Database load (DB load) measures the level of session activity in your database", result["db.load"].Description)
+				assert.Equal(t, "Average Active Sessions", result["db.load"].Unit)
+				
 				for metricName, metricDetails := range result {
 					assert.Equal(t, metricName, metricDetails.Name)
 					assert.NotEmpty(t, metricDetails.Description)
@@ -469,8 +474,12 @@ func TestBuildMetricDefinitionMap(t *testing.T) {
 				Statistic: models.StatisticMax,
 			},
 			expectedError: false,
-			expectedCount: 5,
+			expectedCount: 6, // 5 from mock + 1 db.load added automatically
 			validateResults: func(t *testing.T, result map[string]models.MetricDetails) {
+				// Verify db.load was added automatically with max statistic
+				assert.Contains(t, result, "db.load")
+				assert.Contains(t, result["db.load"].Statistics, models.StatisticMax)
+				
 				for _, metricDetails := range result {
 					assert.Contains(t, metricDetails.Statistics, models.StatisticMax)
 				}
@@ -485,8 +494,11 @@ func TestBuildMetricDefinitionMap(t *testing.T) {
 				Statistic: models.StatisticAvg,
 			},
 			expectedError: false,
-			expectedCount: 5,
+			expectedCount: 6, // 5 from mock + 1 db.load added automatically
 			validateResults: func(t *testing.T, result map[string]models.MetricDetails) {
+				// Verify db.load was added automatically
+				assert.Contains(t, result, "db.load")
+				
 				for _, metricDetails := range result {
 					assert.Contains(t, metricDetails.Statistics, models.StatisticAvg)
 				}
@@ -510,9 +522,11 @@ func TestBuildMetricDefinitionMap(t *testing.T) {
 			},
 			metricConfig:  nil,
 			expectedError: false,
-			expectedCount: 1,
+			expectedCount: 2, // 1 valid metric + 1 db.load added automatically
 			validateResults: func(t *testing.T, result map[string]models.MetricDetails) {
 				assert.Contains(t, result, "os.general.numVCPUs")
+				// Verify db.load was added automatically
+				assert.Contains(t, result, "db.load")
 			},
 		},
 		{
@@ -533,10 +547,12 @@ func TestBuildMetricDefinitionMap(t *testing.T) {
 			},
 			metricConfig:  nil,
 			expectedError: false,
-			expectedCount: 1,
+			expectedCount: 2, // 1 valid metric + 1 db.load added automatically
 			validateResults: func(t *testing.T, result map[string]models.MetricDetails) {
 				assert.Contains(t, result, "os.general.numVCPUs")
 				assert.NotContains(t, result, "os.cpuUtilization.guest")
+				// Verify db.load was added automatically
+				assert.Contains(t, result, "db.load")
 			},
 		},
 		{
@@ -557,10 +573,12 @@ func TestBuildMetricDefinitionMap(t *testing.T) {
 			},
 			metricConfig:  nil,
 			expectedError: false,
-			expectedCount: 1,
+			expectedCount: 2, // 1 valid metric + 1 db.load added automatically
 			validateResults: func(t *testing.T, result map[string]models.MetricDetails) {
 				assert.Contains(t, result, "os.general.numVCPUs")
 				assert.NotContains(t, result, "os.cpuUtilization.idle")
+				// Verify db.load was added automatically
+				assert.Contains(t, result, "db.load")
 			},
 		},
 		{
@@ -576,9 +594,11 @@ func TestBuildMetricDefinitionMap(t *testing.T) {
 			},
 			metricConfig:  nil,
 			expectedError: false,
-			expectedCount: 1,
+			expectedCount: 2, // 1 from input + 1 db.load added automatically
 			validateResults: func(t *testing.T, result map[string]models.MetricDetails) {
 				assert.Equal(t, "Number of active transactions", result["db.Transactions.active_transactions"].Description)
+				// Verify db.load was added automatically
+				assert.Contains(t, result, "db.load")
 			},
 		},
 		{
@@ -594,7 +614,7 @@ func TestBuildMetricDefinitionMap(t *testing.T) {
 			},
 			metricConfig:  nil,
 			expectedError: false,
-			expectedCount: 1,
+			expectedCount: 2, // 1 from input + 1 db.load added automatically
 			validateResults: func(t *testing.T, result map[string]models.MetricDetails) {
 				registry := NewPerEngineMetricRegistry()
 				firstMetrics := []types.ResponseResourceMetric{
@@ -606,7 +626,10 @@ func TestBuildMetricDefinitionMap(t *testing.T) {
 				}
 				firstResult, err := BuildMetricDefinitionMap(firstMetrics, nil, models.AuroraPostgreSQL, registry)
 				assert.NoError(t, err)
+				assert.Len(t, firstResult, 2) // 1 from input + 1 db.load
 				assert.Equal(t, "Number of active transactions", firstResult["db.Transactions.active_transactions"].Description)
+				// Verify db.load was added automatically
+				assert.Contains(t, firstResult, "db.load")
 
 				secondMetrics := []types.ResponseResourceMetric{
 					{
@@ -617,7 +640,10 @@ func TestBuildMetricDefinitionMap(t *testing.T) {
 				}
 				secondResult, err := BuildMetricDefinitionMap(secondMetrics, nil, models.AuroraPostgreSQL, registry)
 				assert.NoError(t, err)
+				assert.Len(t, secondResult, 2) // 1 from input + 1 db.load
 				assert.Equal(t, "Number of active transactions", secondResult["db.Transactions.active_transactions"].Description)
+				// Verify db.load was added automatically
+				assert.Contains(t, secondResult, "db.load")
 			},
 		},
 		{
@@ -633,9 +659,11 @@ func TestBuildMetricDefinitionMap(t *testing.T) {
 			},
 			metricConfig:  nil,
 			expectedError: false,
-			expectedCount: 1,
+			expectedCount: 2, // 1 from input + 1 db.load added automatically
 			validateResults: func(t *testing.T, result map[string]models.MetricDetails) {
 				assert.Equal(t, "Active transaction count for MySQL", result["db.Transactions.active_transactions"].Description)
+				// Verify db.load was added automatically
+				assert.Contains(t, result, "db.load")
 			},
 		},
 		{
@@ -651,9 +679,11 @@ func TestBuildMetricDefinitionMap(t *testing.T) {
 			},
 			metricConfig:  nil,
 			expectedError: false,
-			expectedCount: 1,
+			expectedCount: 2, // 1 from input + 1 db.load added automatically
 			validateResults: func(t *testing.T, result map[string]models.MetricDetails) {
 				assert.Equal(t, "PostgreSQL CPU description", result["os.cpuUtilization.total"].Description)
+				// Verify db.load was added automatically
+				assert.Contains(t, result, "db.load")
 
 				mysqlMetrics := []types.ResponseResourceMetric{
 					{
@@ -665,7 +695,10 @@ func TestBuildMetricDefinitionMap(t *testing.T) {
 				mysqlRegistry := NewPerEngineMetricRegistry()
 				mysqlResult, err := BuildMetricDefinitionMap(mysqlMetrics, nil, models.MySQL, mysqlRegistry)
 				assert.NoError(t, err)
+				assert.Len(t, mysqlResult, 2) // 1 from input + 1 db.load
 				assert.Equal(t, "MySQL CPU description", mysqlResult["os.cpuUtilization.total"].Description)
+				// Verify db.load was added automatically
+				assert.Contains(t, mysqlResult, "db.load")
 			},
 		},
 	}

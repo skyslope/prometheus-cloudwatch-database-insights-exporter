@@ -18,15 +18,17 @@ import (
 )
 
 const (
-	MaxInstances        = 25
-	BatchSize           = 15
-	MaximumConcurrency  = 60
-	DefaultConcurrency  = 4
-	MinTTL              = time.Minute
-	MaxTTL              = time.Hour * 24
-	DefaultInstanceTTL  = time.Minute * 5
-	DefaultMetadataTTL  = time.Minute * 60
-	ValidPrometheusName = `^[a-zA-Z_:][a-zA-Z0-9_:]*$`
+	MaxInstances         = 25
+	BatchSize            = 15
+	MaximumConcurrency   = 60
+	DefaultConcurrency   = 4
+	MinTTL               = time.Minute
+	MaxTTL               = time.Hour * 24
+	DefaultInstanceTTL   = time.Minute * 5
+	DefaultMetadataTTL   = time.Minute * 60
+	DefaultCacheMaxSize  = 100000
+	MinCacheMaxSize      = 1
+	ValidPrometheusName  = `^[a-zA-Z_:][a-zA-Z0-9_:]*$`
 )
 
 func LoadConfig(filePath string) (*models.ParsedConfig, error) {
@@ -56,11 +58,18 @@ func createDefaultConfig() models.Config {
 			Regions: []string{},
 			Instances: models.InstancesConfig{
 				MaxInstances: 0,
-				InstanceTTL:  "",
+				Cache: models.InstancesCacheConfig{
+					TTL: "",
+				},
 			},
 			Metrics: models.MetricsConfig{
-				Statistic:   "",
-				MetadataTTL: "",
+				Statistic: "",
+				Cache: models.MetricsCacheConfig{
+					MetricMetadataTTL: "",
+					MetricData: models.MetricDataCacheConfig{
+						MaxSize: 0,
+					},
+				},
 			},
 			Processing: models.ProcessingConfig{
 				Concurrency: 0,
@@ -84,16 +93,8 @@ func applyDefaults(config *models.Config) {
 		config.Discovery.Instances.MaxInstances = MaxInstances
 	}
 
-	if config.Discovery.Instances.InstanceTTL == "" {
-		config.Discovery.Instances.InstanceTTL = "5m"
-	}
-
 	if config.Discovery.Metrics.Statistic == "" {
 		config.Discovery.Metrics.Statistic = "avg"
-	}
-
-	if config.Discovery.Metrics.MetadataTTL == "" {
-		config.Discovery.Metrics.MetadataTTL = "60m"
 	}
 
 	if config.Discovery.Processing.Concurrency == 0 {
@@ -107,6 +108,18 @@ func applyDefaults(config *models.Config) {
 	if config.Export.Prometheus.MetricPrefix == "" {
 		config.Export.Prometheus.MetricPrefix = "dbi"
 	}
+
+	// Apply cache defaults
+	if config.Discovery.Instances.Cache.TTL == "" {
+		config.Discovery.Instances.Cache.TTL = "5m"
+	}
+	if config.Discovery.Metrics.Cache.MetricMetadataTTL == "" {
+		config.Discovery.Metrics.Cache.MetricMetadataTTL = "60m"
+	}
+	if config.Discovery.Metrics.Cache.MetricData.MaxSize <= 0 {
+		config.Discovery.Metrics.Cache.MetricData.MaxSize = DefaultCacheMaxSize
+	}
+
 }
 
 func parsedValidateConfig(config *models.Config) (*models.ParsedConfig, error) {
@@ -192,12 +205,18 @@ func compileFilterConfig(config models.FilterConfig) (filter.Patterns, error) {
 func parseInstancesConfig(config models.InstancesConfig) (models.ParsedInstancesConfig, error) {
 	maxInstances := GetOrDefault(config.MaxInstances, 1, MaxInstances, MaxInstances, "max-instances")
 
-	instanceTTL, err := time.ParseDuration(config.InstanceTTL)
-	if err != nil {
-		return models.ParsedInstancesConfig{}, fmt.Errorf("invalid instances.ttl format '%s' in config.yml: %v", config.InstanceTTL, err)
+	// Parse instance discovery cache TTL
+	cacheTTL := DefaultInstanceTTL
+	if config.Cache.TTL != "" {
+		ttl, err := time.ParseDuration(config.Cache.TTL)
+		if err != nil {
+			return models.ParsedInstancesConfig{}, fmt.Errorf("invalid discovery.instances.cache.ttl format '%s' in config.yml: %v", config.Cache.TTL, err)
+		}
+		if ttl < 0 {
+			return models.ParsedInstancesConfig{}, fmt.Errorf("invalid discovery.instances.cache.ttl in config.yml: TTL must be positive, got %s", config.Cache.TTL)
+		}
+		cacheTTL = GetOrDefault(ttl, MinTTL, MaxTTL, DefaultInstanceTTL, "discovery.instances.cache.ttl")
 	}
-
-	instanceTTL = GetOrDefault(instanceTTL, MinTTL, MaxTTL, DefaultInstanceTTL, "instances.ttl")
 
 	includePatterns, err := compileFilterConfig(config.Include)
 	if err != nil {
@@ -216,7 +235,7 @@ func parseInstancesConfig(config models.InstancesConfig) (models.ParsedInstances
 
 	return models.ParsedInstancesConfig{
 		MaxInstances: maxInstances,
-		InstanceTTL:  instanceTTL,
+		CacheTTL:     cacheTTL,
 		Filter:       instanceFilter,
 	}, nil
 }
@@ -238,12 +257,54 @@ func parsedMetricsConfig(config models.MetricsConfig) (models.ParsedMetricsConfi
 		return models.ParsedMetricsConfig{}, fmt.Errorf("invalid statistic %s provided in config.yml", config.Statistic)
 	}
 
-	metadataTTL, err := time.ParseDuration(config.MetadataTTL)
-	if err != nil {
-		return models.ParsedMetricsConfig{}, fmt.Errorf("invalid metrics.metadata-ttl format '%s' in config.yml: %v", config.MetadataTTL, err)
+	// Parse metric metadata cache TTL
+	metadataCacheTTL := DefaultMetadataTTL
+	if config.Cache.MetricMetadataTTL != "" {
+		ttl, err := time.ParseDuration(config.Cache.MetricMetadataTTL)
+		if err != nil {
+			return models.ParsedMetricsConfig{}, fmt.Errorf("invalid discovery.metrics.cache.metric-metadata-ttl format '%s' in config.yml: %v", config.Cache.MetricMetadataTTL, err)
+		}
+		if ttl < 0 {
+			return models.ParsedMetricsConfig{}, fmt.Errorf("invalid discovery.metrics.cache.metric-metadata-ttl in config.yml: TTL must be positive, got %s", config.Cache.MetricMetadataTTL)
+		}
+		metadataCacheTTL = GetOrDefault(ttl, MinTTL, MaxTTL, DefaultMetadataTTL, "discovery.metrics.cache.metric-metadata-ttl")
 	}
 
-	metadataTTL = GetOrDefault(metadataTTL, MinTTL, MaxTTL, DefaultMetadataTTL, "metrics.metadata-ttl")
+	// Parse metric data cache configuration
+	dataCacheMaxSize := config.Cache.MetricData.MaxSize
+	if dataCacheMaxSize < MinCacheMaxSize {
+		return models.ParsedMetricsConfig{}, fmt.Errorf("invalid discovery.metrics.cache.metric-data.max-size in config.yml: max size must be >= %d, got %d", MinCacheMaxSize, dataCacheMaxSize)
+	}
+
+	// Parse and validate pattern TTLs
+	var parsedPatternTTLs []models.ParsedPatternTTL
+	for i, patternTTL := range config.Cache.MetricData.PatternTTLs {
+		// Validate pattern regex
+		compiledPattern, err := regexp.Compile(patternTTL.Pattern)
+		if err != nil {
+			return models.ParsedMetricsConfig{}, fmt.Errorf("invalid discovery.metrics.cache.metric-data.pattern-ttls[%d].pattern in config.yml: %v", i, err)
+		}
+
+		// Validate and parse TTL
+		if patternTTL.TTL == "" {
+			return models.ParsedMetricsConfig{}, fmt.Errorf("invalid discovery.metrics.cache.metric-data.pattern-ttls[%d].ttl in config.yml: TTL cannot be empty", i)
+		}
+
+		ttl, err := time.ParseDuration(patternTTL.TTL)
+		if err != nil {
+			return models.ParsedMetricsConfig{}, fmt.Errorf("invalid discovery.metrics.cache.metric-data.pattern-ttls[%d].ttl format '%s' in config.yml: %v", i, patternTTL.TTL, err)
+		}
+
+		// Reject negative TTLs
+		if ttl < 0 {
+			return models.ParsedMetricsConfig{}, fmt.Errorf("invalid discovery.metrics.cache.metric-data.pattern-ttls[%d].ttl in config.yml: TTL must be positive, got %s", i, patternTTL.TTL)
+		}
+
+		parsedPatternTTLs = append(parsedPatternTTLs, models.ParsedPatternTTL{
+			Pattern: compiledPattern.String(),
+			TTL:     ttl,
+		})
+	}
 
 	includePatterns, err := compileFilterConfig(config.Include)
 	if err != nil {
@@ -261,11 +322,13 @@ func parsedMetricsConfig(config models.MetricsConfig) (models.ParsedMetricsConfi
 	}
 
 	return models.ParsedMetricsConfig{
-		Statistic:   defaultStatistic,
-		MetadataTTL: metadataTTL,
-		Filter:      metricFilter,
-		Include:     config.Include,
-		Exclude:     config.Exclude,
+		Statistic:         defaultStatistic,
+		MetadataCacheTTL:  metadataCacheTTL,
+		DataCacheMaxSize:  dataCacheMaxSize,
+		DataCachePatterns: parsedPatternTTLs,
+		Filter:            metricFilter,
+		Include:           config.Include,
+		Exclude:           config.Exclude,
 	}, nil
 }
 

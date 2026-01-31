@@ -20,6 +20,10 @@ type RDSClient struct {
 // RDSClient wraps the AWS RDS SDK with application-specific database discovery functionality.
 // It provides methods for describing database instances.
 func NewRDSClient(region string) (*RDSClient, error) {
+	return NewRDSClientWithEndpoint(region, "")
+}
+
+func NewRDSClientWithEndpoint(region, endpoint string) (*RDSClient, error) {
 	log.Println("[RDS] Creating new RDS client...")
 	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(region))
 	if err != nil {
@@ -27,9 +31,17 @@ func NewRDSClient(region string) (*RDSClient, error) {
 		return nil, err
 	}
 
+	client := rds.NewFromConfig(cfg)
+	if endpoint != "" {
+		client = rds.NewFromConfig(cfg, func(o *rds.Options) {
+			o.BaseEndpoint = aws.String(endpoint)
+		})
+		log.Printf("[RDS] Using custom endpoint: %s", endpoint)
+	}
+
 	log.Printf("[RDS] AWS config loaded, region: %s", region)
 	return &RDSClient{
-		client: rds.NewFromConfig(cfg),
+		client: client,
 	}, nil
 }
 
