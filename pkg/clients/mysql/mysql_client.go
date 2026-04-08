@@ -58,7 +58,7 @@ func (c *MySQLClient) GetTopQueryStats(ctx context.Context, endpoint string, por
 	db.SetMaxOpenConns(1)
 	db.SetConnMaxLifetime(10 * time.Second)
 
-	query := fmt.Sprintf(`
+	baseQuery := `
 		SELECT
 			COALESCE(DIGEST, '') AS digest,
 			COALESCE(LEFT(DIGEST_TEXT, 200), '') AS digest_text,
@@ -70,23 +70,33 @@ func (c *MySQLClient) GetTopQueryStats(ctx context.Context, endpoint string, por
 			SUM_ERRORS AS errors
 		FROM events_statements_summary_by_digest
 		WHERE DIGEST IS NOT NULL AND SCHEMA_NAME IS NOT NULL
-		ORDER BY AVG_TIMER_WAIT DESC
-		LIMIT %d`, topN)
+		ORDER BY %s DESC
+		LIMIT %d`
 
-	rows, err := db.QueryContext(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query performance_schema on %s: %w", endpoint, err)
-	}
-	defer rows.Close()
-
+	seen := make(map[string]bool)
 	var results []QueryStats
-	for rows.Next() {
-		var qs QueryStats
-		if err := rows.Scan(&qs.Digest, &qs.DigestText, &qs.Calls, &qs.AvgDurationMs, &qs.SumLockTimeMs, &qs.SumRowsExamined, &qs.SumRowsSent, &qs.SumErrors); err != nil {
-			log.Printf("[MYSQL] Error scanning row from %s: %v", endpoint, err)
+
+	// Run two queries: top by duration, then top by calls
+	for _, orderBy := range []string{"AVG_TIMER_WAIT", "COUNT_STAR"} {
+		query := fmt.Sprintf(baseQuery, orderBy, topN)
+		rows, err := db.QueryContext(ctx, query)
+		if err != nil {
+			log.Printf("[MYSQL] Error querying performance_schema on %s (order by %s): %v", endpoint, orderBy, err)
 			continue
 		}
-		results = append(results, qs)
+
+		for rows.Next() {
+			var qs QueryStats
+			if err := rows.Scan(&qs.Digest, &qs.DigestText, &qs.Calls, &qs.AvgDurationMs, &qs.SumLockTimeMs, &qs.SumRowsExamined, &qs.SumRowsSent, &qs.SumErrors); err != nil {
+				log.Printf("[MYSQL] Error scanning row from %s: %v", endpoint, err)
+				continue
+			}
+			if !seen[qs.Digest] {
+				seen[qs.Digest] = true
+				results = append(results, qs)
+			}
+		}
+		rows.Close()
 	}
 
 	return results, nil
