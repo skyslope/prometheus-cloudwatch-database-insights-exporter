@@ -15,7 +15,14 @@ type DiscoveryConfig struct {
 	Regions    []string
 	Instances  InstancesConfig
 	Metrics    MetricsConfig
+	Dimensions DimensionsConfig `yaml:"dimensions,omitempty"`
 	Processing ProcessingConfig
+}
+
+type DimensionsConfig struct {
+	Enabled bool     `yaml:"enabled"`
+	TopN    int      `yaml:"top-n"`
+	Groups  []string `yaml:"groups"`
 }
 
 type ExportConfig struct {
@@ -76,7 +83,14 @@ type ParsedDiscoveryConfig struct {
 	Regions    []string
 	Instances  ParsedInstancesConfig
 	Metrics    ParsedMetricsConfig
+	Dimensions ParsedDimensionsConfig
 	Processing ParsedProcessingConfig
+}
+
+type ParsedDimensionsConfig struct {
+	Enabled bool
+	TopN    int32
+	Groups  []string
 }
 
 type ParsedExportConfig struct {

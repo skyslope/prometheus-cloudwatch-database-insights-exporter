@@ -103,6 +103,14 @@ func (mockPIService *MockPIService) GetResourceMetrics(ctx context.Context, reso
 	return args.Get(0).(*pi.GetResourceMetricsOutput), args.Error(1)
 }
 
+func (mockPIService *MockPIService) GetResourceMetricsWithDimensions(ctx context.Context, resourceID string, metric string, dimensionGroup string, limit int32) (*pi.GetResourceMetricsOutput, error) {
+	args := mockPIService.Called(ctx, resourceID, metric, dimensionGroup, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*pi.GetResourceMetricsOutput), args.Error(1)
+}
+
 func NewMockPIListMetricsResponse() *pi.ListAvailableResourceMetricsOutput {
 	return &pi.ListAvailableResourceMetricsOutput{
 		Metrics: []pitypes.ResponseResourceMetric{

@@ -144,3 +144,39 @@ func (piClient *PIClient) GetResourceMetrics(ctx context.Context, resourceID str
 
 	return result, nil
 }
+
+func (piClient *PIClient) GetResourceMetricsWithDimensions(ctx context.Context, resourceID string, metric string, dimensionGroup string, limit int32) (*pi.GetResourceMetricsOutput, error) {
+	metricQueries := []types.MetricQuery{
+		{
+			Metric: aws.String(metric),
+			GroupBy: &types.DimensionGroup{
+				Group: aws.String(dimensionGroup),
+				Limit: aws.Int32(limit),
+			},
+		},
+	}
+
+	startTime := time.Now().Add(-PIMetricLookbackSeconds * time.Second)
+	endTime := time.Now()
+
+	input := &pi.GetResourceMetricsInput{
+		Identifier:      aws.String(resourceID),
+		MetricQueries:   metricQueries,
+		ServiceType:     types.ServiceTypeRds,
+		StartTime:       aws.Time(startTime),
+		EndTime:         aws.Time(endTime),
+		PeriodInSeconds: aws.Int32(60),
+	}
+
+	if utils.IsDebugEnabled() {
+		log.Printf("[DEBUG] GetResourceMetricsWithDimensions Request: resource_id=%s, metric=%s, group=%s, limit=%d",
+			resourceID, metric, dimensionGroup, limit)
+	}
+
+	result, err := piClient.client.GetResourceMetrics(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}

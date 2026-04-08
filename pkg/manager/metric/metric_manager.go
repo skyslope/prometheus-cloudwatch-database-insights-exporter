@@ -149,6 +149,56 @@ func (metricManager *MetricManager) CollectMetricsForBatch(ctx context.Context, 
 	return nil
 }
 
+// CollectDimensionMetrics fetches top-N dimension group data (sql_tokenized, wait_event)
+// and exposes them as Prometheus metrics.
+func (metricManager *MetricManager) CollectDimensionMetrics(ctx context.Context, instance models.Instance, ch chan<- prometheus.Metric) error {
+	dimConfig := metricManager.configuration.Discovery.Dimensions
+	if !dimConfig.Enabled {
+		return nil
+	}
+
+	for _, group := range dimConfig.Groups {
+		result, err := utils.WithRetry(ctx, func() (*awsPI.GetResourceMetricsOutput, error) {
+			return metricManager.piService.GetResourceMetricsWithDimensions(ctx, instance.ResourceID, "db.load.avg", group, dimConfig.TopN)
+		}, MaxRetries, BaseDelay)
+		if err != nil {
+			log.Printf("[METRIC MANAGER] Error getting dimension metrics for %s on %s: %v", group, instance.Identifier, err)
+			continue
+		}
+
+		for _, metricKeyDataPoints := range result.MetricList {
+			if metricKeyDataPoints.Key == nil || metricKeyDataPoints.Key.Metric == nil {
+				continue
+			}
+
+			// Skip the aggregate row (no dimensions)
+			if metricKeyDataPoints.Key.Dimensions == nil || len(metricKeyDataPoints.Key.Dimensions) == 0 {
+				continue
+			}
+
+			validPoints := metricManager.getLatestNValidDataPoints(metricKeyDataPoints.DataPoints, 1)
+			if len(validPoints) == 0 {
+				continue
+			}
+
+			data := models.DimensionMetricData{
+				Metric:     *metricKeyDataPoints.Key.Metric,
+				Group:      group,
+				Dimensions: metricKeyDataPoints.Key.Dimensions,
+				Timestamp:  *validPoints[0].Timestamp,
+				Value:      *validPoints[0].Value,
+			}
+
+			if err := formatting.ConvertDimensionToPrometheusMetric(ch, instance, data, metricManager.configuration.Export.Prometheus.MetricPrefix); err != nil {
+				log.Printf("[METRIC MANAGER] Error converting dimension metric: %v", err)
+				continue
+			}
+		}
+	}
+
+	return nil
+}
+
 func (metricManager *MetricManager) getMetrics(ctx context.Context, resourceID string, engine models.Engine, metrics *models.Metrics) ([]string, error) {
 	if metrics == nil {
 		return nil, fmt.Errorf("[METRIC MANAGER] Metrics not found for instance: %s", resourceID)

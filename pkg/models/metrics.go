@@ -25,6 +25,14 @@ type MetricData struct {
 	Value     float64
 }
 
+type DimensionMetricData struct {
+	Metric     string
+	Group      string            // e.g. "db.sql_tokenized", "db.wait_event"
+	Dimensions map[string]string // e.g. {"db.sql_tokenized.statement": "SELECT ...", "db.sql_tokenized.id": "ABC123"}
+	Timestamp  time.Time
+	Value      float64
+}
+
 func (metric MetricDetails) GetFilterableFields() map[string]string {
 	category := DeriveMetricCategory(metric.Name)
 	return map[string]string{

@@ -2,6 +2,7 @@ package region
 
 import (
 	"context"
+	"log"
 	"sync"
 
 	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/manager/instance"
@@ -52,7 +53,18 @@ func (singleRegionManager *SingleRegionManager) CollectMetrics(ctx context.Conte
 		return err
 	}
 
-	return singleRegionManager.collectMetricsWithQueue(ctx, instances, ch)
+	if err := singleRegionManager.collectMetricsWithQueue(ctx, instances, ch); err != nil {
+		return err
+	}
+
+	// Collect dimension metrics (top SQL, wait events) for each instance
+	for _, inst := range instances {
+		if err := singleRegionManager.metricManager.CollectDimensionMetrics(ctx, inst, ch); err != nil {
+			log.Printf("[REGION] Error collecting dimension metrics for %s: %v", inst.Identifier, err)
+		}
+	}
+
+	return nil
 }
 
 // CollectMetricsForInstances discovers and collects metrics from all eligible and specified database instances in the region.

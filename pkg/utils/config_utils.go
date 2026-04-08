@@ -145,6 +145,7 @@ func parsedValidateConfig(config *models.Config) (*models.ParsedConfig, error) {
 	parsedConfig.Discovery.Metrics = metricsConfig
 
 	parsedConfig.Discovery.Processing = parseProcessingConfig(config.Discovery.Processing)
+	parsedConfig.Discovery.Dimensions = parseDimensionsConfig(config.Discovery.Dimensions)
 
 	exportConfig, err := parseExportConfig(config.Export)
 	if err != nil {
@@ -330,6 +331,33 @@ func parsedMetricsConfig(config models.MetricsConfig) (models.ParsedMetricsConfi
 		Include:           config.Include,
 		Exclude:           config.Exclude,
 	}, nil
+}
+
+func parseDimensionsConfig(config models.DimensionsConfig) models.ParsedDimensionsConfig {
+	topN := int32(10)
+	if config.TopN > 0 && config.TopN <= 25 {
+		topN = int32(config.TopN)
+	}
+
+	validGroups := map[string]bool{
+		"db.sql_tokenized": true,
+		"db.wait_event":    true,
+	}
+
+	var groups []string
+	for _, g := range config.Groups {
+		if validGroups[g] {
+			groups = append(groups, g)
+		} else {
+			log.Printf("[CONFIG] Ignoring unsupported dimension group: %s", g)
+		}
+	}
+
+	return models.ParsedDimensionsConfig{
+		Enabled: config.Enabled && len(groups) > 0,
+		TopN:    topN,
+		Groups:  groups,
+	}
 }
 
 func parseProcessingConfig(config models.ProcessingConfig) models.ParsedProcessingConfig {

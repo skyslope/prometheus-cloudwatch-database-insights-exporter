@@ -72,6 +72,53 @@ func buildPrometheusDescription(metricNameWithStat string, metricDescription str
 	)
 }
 
+func ConvertDimensionToPrometheusMetric(ch chan<- prometheus.Metric, instance models.Instance, data models.DimensionMetricData, metricPrefix string) error {
+	engineShortStr := utils.EngineToShortName(instance.Engine)
+
+	var metricName string
+	var labels []string
+	var labelValues []string
+
+	switch data.Group {
+	case "db.sql_tokenized":
+		metricName = metricPrefix + "_" + engineShortStr + "_top_sql_load_avg"
+		labels = []string{"identifier", "engine", "digest", "statement"}
+		labelValues = []string{
+			instance.Identifier,
+			string(instance.Engine),
+			data.Dimensions["db.sql_tokenized.id"],
+			truncateLabel(data.Dimensions["db.sql_tokenized.statement"], 200),
+		}
+	case "db.wait_event":
+		metricName = metricPrefix + "_" + engineShortStr + "_wait_event_load_avg"
+		labels = []string{"identifier", "engine", "wait_event", "wait_type"}
+		labelValues = []string{
+			instance.Identifier,
+			string(instance.Engine),
+			data.Dimensions["db.wait_event.name"],
+			data.Dimensions["db.wait_event.type"],
+		}
+	default:
+		return fmt.Errorf("unsupported dimension group: %s", data.Group)
+	}
+
+	desc := prometheus.NewDesc(metricName, fmt.Sprintf("Top database load by %s", data.Group), labels, nil)
+	m, err := prometheus.NewConstMetric(desc, prometheus.GaugeValue, data.Value, labelValues...)
+	if err != nil {
+		return err
+	}
+
+	ch <- prometheus.NewMetricWithTimestamp(data.Timestamp, m)
+	return nil
+}
+
+func truncateLabel(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
+}
+
 func buildPrometheusMetricName(metricPrefix string, engineShortStr string, metricWithStatistic string) string {
 	if strings.HasPrefix(metricWithStatistic, "db.") {
 		metricPrefix = metricPrefix + "_" + engineShortStr
