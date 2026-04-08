@@ -37,6 +37,8 @@ type SafeInstanceFields struct {
 	PerformanceInsightsEnabled bool
 	DbiResourceId              string
 	DBInstanceIdentifier       string
+	Endpoint                   string
+	Port                       int32
 	InstanceCreateTime         time.Time
 }
 
@@ -119,6 +121,8 @@ func (instanceManager *RDSInstanceManager) discoverInstances(ctx context.Context
 			instance = models.Instance{
 				ResourceID:   instanceFields.DbiResourceId,
 				Identifier:   instanceFields.DBInstanceIdentifier,
+				Endpoint:     instanceFields.Endpoint,
+				Port:         instanceFields.Port,
 				Engine:       engine,
 				CreationTime: instanceFields.InstanceCreateTime,
 				Tags:         tags,
@@ -174,6 +178,15 @@ func safeExtractInstanceFields(instance types.DBInstance) (*SafeInstanceFields, 
 		fields.PerformanceInsightsEnabled = *instance.PerformanceInsightsEnabled
 	} else {
 		fields.PerformanceInsightsEnabled = false
+	}
+
+	if instance.Endpoint != nil {
+		if instance.Endpoint.Address != nil {
+			fields.Endpoint = *instance.Endpoint.Address
+		}
+		if instance.Endpoint.Port != nil {
+			fields.Port = *instance.Endpoint.Port
+		}
 	}
 
 	if instance.InstanceCreateTime == nil {

@@ -146,6 +146,7 @@ func parsedValidateConfig(config *models.Config) (*models.ParsedConfig, error) {
 
 	parsedConfig.Discovery.Processing = parseProcessingConfig(config.Discovery.Processing)
 	parsedConfig.Discovery.Dimensions = parseDimensionsConfig(config.Discovery.Dimensions)
+	parsedConfig.Discovery.QueryMetrics = parseQueryMetricsConfig(config.Discovery.QueryMetrics)
 
 	exportConfig, err := parseExportConfig(config.Export)
 	if err != nil {
@@ -357,6 +358,17 @@ func parseDimensionsConfig(config models.DimensionsConfig) models.ParsedDimensio
 		Enabled: config.Enabled && len(groups) > 0,
 		TopN:    topN,
 		Groups:  groups,
+	}
+}
+
+func parseQueryMetricsConfig(config models.QueryMetricsConfig) models.ParsedQueryMetricsConfig {
+	topN := 20
+	if config.TopN > 0 && config.TopN <= 50 {
+		topN = config.TopN
+	}
+	return models.ParsedQueryMetricsConfig{
+		Enabled: config.Enabled,
+		TopN:    topN,
 	}
 }
 

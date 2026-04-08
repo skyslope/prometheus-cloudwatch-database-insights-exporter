@@ -57,10 +57,13 @@ func (singleRegionManager *SingleRegionManager) CollectMetrics(ctx context.Conte
 		return err
 	}
 
-	// Collect dimension metrics (top SQL, wait events) for each instance
+	// Collect dimension metrics (top SQL, wait events) and query metrics for each instance
 	for _, inst := range instances {
 		if err := singleRegionManager.metricManager.CollectDimensionMetrics(ctx, inst, ch); err != nil {
 			log.Printf("[REGION] Error collecting dimension metrics for %s: %v", inst.Identifier, err)
+		}
+		if err := singleRegionManager.metricManager.CollectQueryMetrics(ctx, inst, ch); err != nil {
+			log.Printf("[REGION] Error collecting query metrics for %s: %v", inst.Identifier, err)
 		}
 	}
 

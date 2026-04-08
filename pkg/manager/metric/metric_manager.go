@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/cache"
+	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/clients/mysql"
 	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/clients/pi"
 	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/models"
 	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/processing/formatting"
@@ -24,6 +25,7 @@ const (
 
 type MetricManager struct {
 	piService        pi.PIService
+	mysqlClient      *mysql.MySQLClient
 	configuration    *models.ParsedConfig
 	registry         *utils.PerEngineMetricRegistry
 	metricDataCache  cache.MetricCache
@@ -59,8 +61,15 @@ func NewMetricManager(pi pi.PIService, config *models.ParsedConfig, region strin
 		return nil, fmt.Errorf("failed to create TTL policy manager: %w", err)
 	}
 
+	// Initialize MySQL client for query metrics
+	mysqlClient := mysql.NewMySQLClient()
+	if config.Discovery.QueryMetrics.Enabled && !mysqlClient.IsConfigured() {
+		log.Printf("[METRIC MANAGER] Warning: query-metrics enabled but DB_PASSWORD not set, query metrics will be skipped")
+	}
+
 	return &MetricManager{
 		piService:        pi,
+		mysqlClient:      mysqlClient,
 		configuration:    config,
 		registry:         utils.NewPerEngineMetricRegistry(),
 		metricDataCache:  metricDataCache,
@@ -194,6 +203,36 @@ func (metricManager *MetricManager) CollectDimensionMetrics(ctx context.Context,
 				continue
 			}
 		}
+	}
+
+	return nil
+}
+
+// CollectQueryMetrics queries performance_schema directly for per-query stats.
+func (metricManager *MetricManager) CollectQueryMetrics(ctx context.Context, instance models.Instance, ch chan<- prometheus.Metric) error {
+	qmConfig := metricManager.configuration.Discovery.QueryMetrics
+	if !qmConfig.Enabled || !metricManager.mysqlClient.IsConfigured() {
+		return nil
+	}
+
+	if instance.Endpoint == "" || instance.Port == 0 {
+		return nil
+	}
+
+	stats, err := metricManager.mysqlClient.GetTopQueryStats(ctx, instance.Endpoint, instance.Port, qmConfig.TopN)
+	if err != nil {
+		log.Printf("[METRIC MANAGER] Error querying performance_schema on %s: %v", instance.Identifier, err)
+		return err
+	}
+
+	prefix := metricManager.configuration.Export.Prometheus.MetricPrefix
+	for _, qs := range stats {
+		formatting.ConvertQueryStatsToPrometheusMetrics(
+			ch, instance.Identifier, string(instance.Engine), prefix,
+			qs.Digest, qs.DigestText,
+			qs.Calls, qs.AvgDurationMs, qs.SumLockTimeMs,
+			qs.SumRowsExamined, qs.SumRowsSent, qs.SumErrors,
+		)
 	}
 
 	return nil

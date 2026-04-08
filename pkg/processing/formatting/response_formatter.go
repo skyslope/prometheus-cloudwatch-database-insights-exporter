@@ -112,6 +112,34 @@ func ConvertDimensionToPrometheusMetric(ch chan<- prometheus.Metric, instance mo
 	return nil
 }
 
+func ConvertQueryStatsToPrometheusMetrics(ch chan<- prometheus.Metric, identifier string, engine string, metricPrefix string, digest string, statement string, calls int64, avgDurationMs float64, lockTimeMs float64, rowsExamined int64, rowsSent int64, errors int64) {
+	engineShort := utils.EngineToShortName(models.Engine(engine))
+	labels := []string{"identifier", "engine", "digest", "statement"}
+	labelValues := []string{identifier, engine, digest, truncateLabel(statement, 200)}
+
+	metrics := []struct {
+		name  string
+		desc  string
+		value float64
+	}{
+		{metricPrefix + "_" + engineShort + "_query_calls_total", "Total number of times this query has been executed", float64(calls)},
+		{metricPrefix + "_" + engineShort + "_query_avg_duration_ms", "Average execution duration in milliseconds", avgDurationMs},
+		{metricPrefix + "_" + engineShort + "_query_lock_time_ms", "Total lock time in milliseconds", lockTimeMs},
+		{metricPrefix + "_" + engineShort + "_query_rows_examined_total", "Total rows examined", float64(rowsExamined)},
+		{metricPrefix + "_" + engineShort + "_query_rows_sent_total", "Total rows sent to client", float64(rowsSent)},
+		{metricPrefix + "_" + engineShort + "_query_errors_total", "Total errors", float64(errors)},
+	}
+
+	for _, m := range metrics {
+		desc := prometheus.NewDesc(m.name, m.desc, labels, nil)
+		metric, err := prometheus.NewConstMetric(desc, prometheus.GaugeValue, m.value, labelValues...)
+		if err != nil {
+			continue
+		}
+		ch <- metric
+	}
+}
+
 func truncateLabel(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s

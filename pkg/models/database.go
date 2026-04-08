@@ -7,6 +7,8 @@ import (
 type Instance struct {
 	ResourceID   string
 	Identifier   string
+	Endpoint     string
+	Port         int32
 	Engine       Engine
 	CreationTime time.Time
 	Tags         map[string]string

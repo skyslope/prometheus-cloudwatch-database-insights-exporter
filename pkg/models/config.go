@@ -12,17 +12,23 @@ type Config struct {
 }
 
 type DiscoveryConfig struct {
-	Regions    []string
-	Instances  InstancesConfig
-	Metrics    MetricsConfig
-	Dimensions DimensionsConfig `yaml:"dimensions,omitempty"`
-	Processing ProcessingConfig
+	Regions      []string
+	Instances    InstancesConfig
+	Metrics      MetricsConfig
+	Dimensions   DimensionsConfig   `yaml:"dimensions,omitempty"`
+	QueryMetrics QueryMetricsConfig `yaml:"query-metrics,omitempty"`
+	Processing   ProcessingConfig
 }
 
 type DimensionsConfig struct {
 	Enabled bool     `yaml:"enabled"`
 	TopN    int      `yaml:"top-n"`
 	Groups  []string `yaml:"groups"`
+}
+
+type QueryMetricsConfig struct {
+	Enabled bool `yaml:"enabled"`
+	TopN    int  `yaml:"top-n"`
 }
 
 type ExportConfig struct {
@@ -80,17 +86,23 @@ type ParsedConfig struct {
 }
 
 type ParsedDiscoveryConfig struct {
-	Regions    []string
-	Instances  ParsedInstancesConfig
-	Metrics    ParsedMetricsConfig
-	Dimensions ParsedDimensionsConfig
-	Processing ParsedProcessingConfig
+	Regions      []string
+	Instances    ParsedInstancesConfig
+	Metrics      ParsedMetricsConfig
+	Dimensions   ParsedDimensionsConfig
+	QueryMetrics ParsedQueryMetricsConfig
+	Processing   ParsedProcessingConfig
 }
 
 type ParsedDimensionsConfig struct {
 	Enabled bool
 	TopN    int32
 	Groups  []string
+}
+
+type ParsedQueryMetricsConfig struct {
+	Enabled bool
+	TopN    int
 }
 
 type ParsedExportConfig struct {

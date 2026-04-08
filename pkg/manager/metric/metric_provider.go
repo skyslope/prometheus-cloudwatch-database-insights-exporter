@@ -11,4 +11,5 @@ type MetricProvider interface {
 	GetMetricBatches(ctx context.Context, instance models.Instance) ([][]string, error)
 	CollectMetricsForBatch(ctx context.Context, instance models.Instance, metricsBatch []string, ch chan<- prometheus.Metric) error
 	CollectDimensionMetrics(ctx context.Context, instance models.Instance, ch chan<- prometheus.Metric) error
+	CollectQueryMetrics(ctx context.Context, instance models.Instance, ch chan<- prometheus.Metric) error
 }
