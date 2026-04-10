@@ -228,7 +228,7 @@ func (metricManager *MetricManager) CollectQueryMetrics(ctx context.Context, ins
 	prefix := metricManager.configuration.Export.Prometheus.MetricPrefix
 	for _, qs := range stats {
 		formatting.ConvertQueryStatsToPrometheusMetrics(
-			ch, instance.Identifier, string(instance.Engine), prefix,
+			ch, instance.Identifier, instance.ClusterIdentifier, string(instance.Engine), prefix,
 			qs.Digest, qs.DigestText,
 			qs.Calls, qs.AvgDurationMs, qs.SumLockTimeMs,
 			qs.SumRowsExamined, qs.SumRowsSent, qs.SumErrors,

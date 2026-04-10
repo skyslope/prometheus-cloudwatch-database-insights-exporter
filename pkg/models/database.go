@@ -5,14 +5,15 @@ import (
 )
 
 type Instance struct {
-	ResourceID   string
-	Identifier   string
-	Endpoint     string
-	Port         int32
-	Engine       Engine
-	CreationTime time.Time
-	Tags         map[string]string
-	Metrics      *Metrics
+	ResourceID        string
+	Identifier        string
+	ClusterIdentifier string
+	Endpoint          string
+	Port              int32
+	Engine            Engine
+	CreationTime      time.Time
+	Tags              map[string]string
+	Metrics           *Metrics
 }
 
 func (instance Instance) GetFilterableFields() map[string]string {
