@@ -1,0 +1,324 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"color": "blue", "value": null}]}}},
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"colorMode": "value", "graphMode": "none", "textMode": "value"},
+      "targets": [{"expr": "count(count by (identifier) (dbi_ams_db_users_threads_running_avg))", "refId": "A"}],
+      "title": "Instances",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "description": "Total queries per second across all instances",
+      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 5000}, {"color": "red", "value": 10000}]}, "unit": "short"}},
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
+      "id": 2,
+      "options": {"colorMode": "value", "graphMode": "area", "textMode": "value"},
+      "targets": [{"expr": "sum(dbi_ams_db_sql_questions_avg{identifier=~\"$instance\"})", "refId": "A"}],
+      "title": "Current QPS",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "description": "Total threads connected across all instances",
+      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 500}, {"color": "red", "value": 1000}]}, "unit": "short"}},
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
+      "id": 3,
+      "options": {"colorMode": "value", "graphMode": "area", "textMode": "value"},
+      "targets": [{"expr": "sum(dbi_ams_db_users_threads_connected_avg{identifier=~\"$instance\"})", "refId": "A"}],
+      "title": "Connections",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"decimals": 2, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 10}]}, "unit": "short"}},
+      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 0},
+      "id": 4,
+      "options": {"colorMode": "value", "graphMode": "area", "textMode": "value"},
+      "targets": [{"expr": "sum(dbi_ams_db_sql_slow_queries_avg{identifier=~\"$instance\"})", "refId": "A"}],
+      "title": "Slow Queries/sec",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "description": "Average InnoDB buffer pool hit rate across instances",
+      "fieldConfig": {"defaults": {"decimals": 2, "thresholds": {"steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 95}, {"color": "green", "value": 99}]}, "unit": "percent"}},
+      "gridPos": {"h": 4, "w": 4, "x": 16, "y": 0},
+      "id": 5,
+      "options": {"colorMode": "value", "graphMode": "none", "textMode": "value"},
+      "targets": [{"expr": "avg(dbi_ams_db_cache_innodb_buffer_pool_hit_rate_avg{identifier=~\"$instance\"})", "refId": "A"}],
+      "title": "Buffer Pool Hit Rate",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "description": "Average CPU utilization across instances",
+      "fieldConfig": {"defaults": {"decimals": 1, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 60}, {"color": "red", "value": 85}]}, "unit": "percent"}},
+      "gridPos": {"h": 4, "w": 4, "x": 20, "y": 0},
+      "id": 6,
+      "options": {"colorMode": "value", "graphMode": "area", "textMode": "value"},
+      "targets": [{"expr": "avg(dbi_os_cpuutilization_total_avg{identifier=~\"$instance\"})", "refId": "A"}],
+      "title": "Avg CPU %",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 10, "lineWidth": 2, "showPoints": "never"}, "unit": "short"}},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "id": 10,
+      "options": {"legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [{"expr": "dbi_ams_db_sql_questions_avg{identifier=~\"$instance\"}", "legendFormat": "{{identifier}}", "refId": "A"}],
+      "title": "Queries Per Second",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 10, "lineWidth": 2, "showPoints": "never"}, "unit": "short"}},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "id": 11,
+      "options": {"legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "dbi_ams_db_users_threads_connected_avg{identifier=~\"$instance\"}", "legendFormat": "{{identifier}} connected", "refId": "A"},
+        {"expr": "dbi_ams_db_users_threads_running_avg{identifier=~\"$instance\"}", "legendFormat": "{{identifier}} running", "refId": "B"}
+      ],
+      "title": "Connections",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 15, "lineWidth": 2, "showPoints": "never"}, "max": 100, "unit": "percent"}},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+      "id": 12,
+      "options": {"legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [{"expr": "dbi_os_cpuutilization_total_avg{identifier=~\"$instance\"}", "legendFormat": "{{identifier}}", "refId": "A"}],
+      "title": "CPU Utilization %",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 15, "lineWidth": 2, "showPoints": "never"}, "max": 100, "unit": "percent"}},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+      "id": 13,
+      "options": {"legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [{"expr": "(1 - (dbi_os_memory_free_avg{identifier=~\"$instance\"} / dbi_os_memory_total_avg{identifier=~\"$instance\"})) * 100", "legendFormat": "{{identifier}}", "refId": "A"}],
+      "title": "Memory Usage %",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 10, "lineWidth": 2, "showPoints": "never"}, "unit": "ms"}},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+      "id": 14,
+      "options": {"legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "dbi_os_diskio_aurorastorage_readlatency_avg{identifier=~\"$instance\"}", "legendFormat": "{{identifier}} read", "refId": "A"},
+        {"expr": "dbi_os_diskio_aurorastorage_writelatency_avg{identifier=~\"$instance\"}", "legendFormat": "{{identifier}} write", "refId": "B"}
+      ],
+      "title": "Aurora Storage Read/Write Latency (ms)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 10, "lineWidth": 2, "showPoints": "never"}, "unit": "iops"}},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+      "id": 15,
+      "options": {"legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "dbi_os_diskio_aurorastorage_readiosps_avg{identifier=~\"$instance\"}", "legendFormat": "{{identifier}} read IOPS", "refId": "A"},
+        {"expr": "dbi_os_diskio_aurorastorage_writeiosps_avg{identifier=~\"$instance\"}", "legendFormat": "{{identifier}} write IOPS", "refId": "B"}
+      ],
+      "title": "Aurora Storage IOPS",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 15, "lineWidth": 2, "showPoints": "never"}, "unit": "short"}},
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 28},
+      "id": 16,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [{"expr": "dbi_ams_db_locks_innodb_row_lock_waits_avg{identifier=~\"$instance\"}", "legendFormat": "{{identifier}}", "refId": "A"}],
+      "title": "InnoDB Row Lock Waits",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 15, "lineWidth": 2, "showPoints": "never"}, "unit": "short"}},
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 28},
+      "id": 17,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [{"expr": "dbi_ams_db_locks_innodb_deadlocks_avg{identifier=~\"$instance\"}", "legendFormat": "{{identifier}}", "refId": "A"}],
+      "title": "InnoDB Deadlocks",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 15, "lineWidth": 2, "showPoints": "never"}, "unit": "short"}},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 28},
+      "id": 18,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [{"expr": "dbi_ams_db_locks_innodb_lock_timeouts_avg{identifier=~\"$instance\"}", "legendFormat": "{{identifier}}", "refId": "A"}],
+      "title": "InnoDB Lock Timeouts",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 10, "lineWidth": 2, "showPoints": "never"}, "max": 100, "min": 90, "unit": "percent"}},
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 36},
+      "id": 20,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [{"expr": "dbi_ams_db_cache_innodb_buffer_pool_hit_rate_avg{identifier=~\"$instance\"}", "legendFormat": "{{identifier}}", "refId": "A"}],
+      "title": "Buffer Pool Hit Rate %",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 10, "lineWidth": 2, "showPoints": "never"}, "unit": "short"}},
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 36},
+      "id": 21,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "dbi_ams_db_cache_innodb_buffer_pool_read_requests_avg{identifier=~\"$instance\"}", "legendFormat": "{{identifier}} requests", "refId": "A"},
+        {"expr": "dbi_ams_db_cache_innodb_buffer_pool_reads_avg{identifier=~\"$instance\"}", "legendFormat": "{{identifier}} disk reads", "refId": "B"}
+      ],
+      "title": "Buffer Pool Reads/sec",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 15, "lineWidth": 2, "showPoints": "never"}, "unit": "short"}},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 36},
+      "id": 22,
+      "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [{"expr": "dbi_ams_db_sql_slow_queries_avg{identifier=~\"$instance\"}", "legendFormat": "{{identifier}}", "refId": "A"}],
+      "title": "Slow Queries/sec",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 10, "lineWidth": 2, "showPoints": "never"}, "unit": "KBs"}},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 44},
+      "id": 30,
+      "options": {"legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "dbi_os_network_rx_avg{identifier=~\"$instance\"}", "legendFormat": "{{identifier}} RX", "refId": "A"},
+        {"expr": "dbi_os_network_tx_avg{identifier=~\"$instance\"}", "legendFormat": "{{identifier}} TX", "refId": "B"}
+      ],
+      "title": "Network Throughput",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {"defaults": {"custom": {"fillOpacity": 5, "lineWidth": 2, "showPoints": "never"}, "unit": "short"}},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 44},
+      "id": 31,
+      "options": {"legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"expr": "dbi_os_loadaverageminute_one_avg{identifier=~\"$instance\"}", "legendFormat": "{{identifier}} 1m", "refId": "A"},
+        {"expr": "dbi_os_loadaverageminute_five_avg{identifier=~\"$instance\"}", "legendFormat": "{{identifier}} 5m", "refId": "B"},
+        {"expr": "dbi_os_loadaverageminute_fifteen_avg{identifier=~\"$instance\"}", "legendFormat": "{{identifier}} 15m", "refId": "C"}
+      ],
+      "title": "Load Average (1m / 5m / 15m)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {
+        "defaults": {"custom": {"align": "auto", "cellOptions": {"type": "auto"}, "filterable": true}},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "statement"}, "properties": [{"id": "displayName", "value": "Query"}]},
+          {"matcher": {"id": "byName", "options": "Value #calls"}, "properties": [{"id": "displayName", "value": "Calls"}, {"id": "decimals", "value": 0}, {"id": "unit", "value": "short"}, {"id": "custom.cellOptions", "value": {"mode": "gradient", "type": "gauge"}}, {"id": "color", "value": {"mode": "continuous-GrYlRd"}}, {"id": "min", "value": 0}, {"id": "max", "value": 100000}]},
+          {"matcher": {"id": "byName", "options": "Value #duration"}, "properties": [{"id": "displayName", "value": "Avg Duration"}, {"id": "decimals", "value": 2}, {"id": "unit", "value": "ms"}]},
+          {"matcher": {"id": "byName", "options": "Value #errors"}, "properties": [{"id": "displayName", "value": "Errors"}, {"id": "decimals", "value": 0}, {"id": "unit", "value": "short"}]},
+          {"matcher": {"id": "byName", "options": "Value #rows_exam"}, "properties": [{"id": "displayName", "value": "Rows Examined"}, {"id": "decimals", "value": 0}, {"id": "unit", "value": "short"}]},
+          {"matcher": {"id": "byName", "options": "Value #rows_sent"}, "properties": [{"id": "displayName", "value": "Rows Sent"}, {"id": "decimals", "value": 0}, {"id": "unit", "value": "short"}]}
+        ]
+      },
+      "gridPos": {"h": 16, "w": 12, "x": 0, "y": 52},
+      "id": 32,
+      "options": {"footer": {"show": false}, "showHeader": true, "sortBy": [{"desc": true, "displayName": "Calls"}]},
+      "targets": [
+        {"expr": "avg by (statement, digest) (dbi_ams_query_avg_duration_ms{identifier=~\"$instance\"})", "format": "table", "instant": true, "refId": "duration"},
+        {"expr": "sum by (statement, digest) (dbi_ams_query_calls_total{identifier=~\"$instance\"})", "format": "table", "instant": true, "refId": "calls"},
+        {"expr": "sum by (statement, digest) (dbi_ams_query_errors_total{identifier=~\"$instance\"})", "format": "table", "instant": true, "refId": "errors"},
+        {"expr": "sum by (statement, digest) (dbi_ams_query_rows_examined_total{identifier=~\"$instance\"})", "format": "table", "instant": true, "refId": "rows_exam"},
+        {"expr": "sum by (statement, digest) (dbi_ams_query_rows_sent_total{identifier=~\"$instance\"})", "format": "table", "instant": true, "refId": "rows_sent"}
+      ],
+      "title": "Top Queries by Calls",
+      "transformations": [
+        {"id": "seriesToColumns", "options": {"byField": "digest"}},
+        {"id": "organize", "options": {"excludeByName": {"Time 1": true, "Time 2": true, "Time 3": true, "Time 4": true, "Time 5": true, "digest": true, "statement 2": true, "statement 3": true, "statement 4": true, "statement 5": true}, "indexByName": {"statement 1": 0, "Value #calls": 1, "Value #duration": 2, "Value #errors": 3, "Value #rows_exam": 4, "Value #rows_sent": 5}, "renameByName": {"statement 1": "statement"}}}
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "fieldConfig": {
+        "defaults": {"custom": {"align": "auto", "cellOptions": {"type": "auto"}, "filterable": true}},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "statement"}, "properties": [{"id": "displayName", "value": "Query"}]},
+          {"matcher": {"id": "byName", "options": "Value #duration"}, "properties": [{"id": "displayName", "value": "Avg Duration"}, {"id": "decimals", "value": 2}, {"id": "unit", "value": "ms"}, {"id": "custom.cellOptions", "value": {"mode": "gradient", "type": "gauge"}}, {"id": "color", "value": {"mode": "continuous-BlYlRd"}}, {"id": "min", "value": 0}, {"id": "max", "value": 5000}]},
+          {"matcher": {"id": "byName", "options": "Value #calls"}, "properties": [{"id": "displayName", "value": "Calls"}, {"id": "decimals", "value": 0}, {"id": "unit", "value": "short"}]},
+          {"matcher": {"id": "byName", "options": "Value #lock"}, "properties": [{"id": "displayName", "value": "Lock Time"}, {"id": "decimals", "value": 2}, {"id": "unit", "value": "ms"}]},
+          {"matcher": {"id": "byName", "options": "Value #rows_exam"}, "properties": [{"id": "displayName", "value": "Rows Examined"}, {"id": "decimals", "value": 0}, {"id": "unit", "value": "short"}]},
+          {"matcher": {"id": "byName", "options": "Value #rows_sent"}, "properties": [{"id": "displayName", "value": "Rows Sent"}, {"id": "decimals", "value": 0}, {"id": "unit", "value": "short"}]}
+        ]
+      },
+      "gridPos": {"h": 16, "w": 12, "x": 12, "y": 52},
+      "id": 33,
+      "options": {"footer": {"show": false}, "showHeader": true, "sortBy": [{"desc": true, "displayName": "Avg Duration"}]},
+      "targets": [
+        {"expr": "avg by (statement, digest) (dbi_ams_query_avg_duration_ms{identifier=~\"$instance\"})", "format": "table", "instant": true, "refId": "duration"},
+        {"expr": "sum by (statement, digest) (dbi_ams_query_calls_total{identifier=~\"$instance\"})", "format": "table", "instant": true, "refId": "calls"},
+        {"expr": "sum by (statement, digest) (dbi_ams_query_lock_time_ms{identifier=~\"$instance\"})", "format": "table", "instant": true, "refId": "lock"},
+        {"expr": "sum by (statement, digest) (dbi_ams_query_rows_examined_total{identifier=~\"$instance\"})", "format": "table", "instant": true, "refId": "rows_exam"},
+        {"expr": "sum by (statement, digest) (dbi_ams_query_rows_sent_total{identifier=~\"$instance\"})", "format": "table", "instant": true, "refId": "rows_sent"}
+      ],
+      "title": "Top Queries by Duration",
+      "transformations": [
+        {"id": "seriesToColumns", "options": {"byField": "digest"}},
+        {"id": "organize", "options": {"excludeByName": {"Time 1": true, "Time 2": true, "Time 3": true, "Time 4": true, "Time 5": true, "digest": true, "statement 2": true, "statement 3": true, "statement 4": true, "statement 5": true}, "indexByName": {"statement 1": 0, "Value #duration": 1, "Value #calls": 2, "Value #lock": 3, "Value #rows_exam": 4, "Value #rows_sent": 5}, "renameByName": {"statement 1": "statement"}}}
+      ],
+      "type": "table"
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": ["sre", "rds", "aurora", "dbi"],
+  "templating": {
+    "list": [
+      {
+        "current": {"text": "grafanacloud-prom", "value": "grafanacloud-prom"},
+        "hide": 0,
+        "includeAll": false,
+        "label": "Datasource",
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "type": "datasource"
+      },
+      {
+        "current": {"text": "All", "value": "$__all"},
+        "datasource": {"type": "prometheus", "uid": "${datasource}"},
+        "includeAll": true,
+        "multi": true,
+        "name": "instance",
+        "query": "label_values(dbi_ams_db_users_threads_running_avg, identifier)",
+        "refresh": 2,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {"from": "now-1h", "to": "now"},
+  "timezone": "browser",
+  "title": "RDS Aurora - DBI Overview",
+  "uid": null
+}
