@@ -5,10 +5,11 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+
+	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/models"
 )
 
 type QueryStats struct {
@@ -23,31 +24,48 @@ type QueryStats struct {
 }
 
 type MySQLClient struct {
-	username string
-	password string
-	timeout  time.Duration
+	credentials []models.ParsedQueryCredential
+	timeout     time.Duration
 }
 
-func NewMySQLClient() *MySQLClient {
-	username := os.Getenv("DB_USERNAME")
-	password := os.Getenv("DB_PASSWORD")
-	if username == "" {
-		username = "dbi_reader"
-	}
+func NewMySQLClient(credentials []models.ParsedQueryCredential) *MySQLClient {
 	return &MySQLClient{
-		username: username,
-		password: password,
-		timeout:  5 * time.Second,
+		credentials: credentials,
+		timeout:     5 * time.Second,
 	}
 }
 
 func (c *MySQLClient) IsConfigured() bool {
-	return c.password != ""
+	return len(c.credentials) > 0
 }
 
-func (c *MySQLClient) GetTopQueryStats(ctx context.Context, endpoint string, port int32, topN int) ([]QueryStats, error) {
+// GetCredentialsForCluster returns the username/password for a given cluster.
+// If a specific cluster match is found, use it. Otherwise fall back to the
+// default credential (empty cluster name) if one exists.
+func (c *MySQLClient) GetCredentialsForCluster(clusterIdentifier string) (string, string, bool) {
+	var defaultCred *models.ParsedQueryCredential
+	for i := range c.credentials {
+		if c.credentials[i].Cluster == clusterIdentifier {
+			return c.credentials[i].Username, c.credentials[i].Password, true
+		}
+		if c.credentials[i].Cluster == "" {
+			defaultCred = &c.credentials[i]
+		}
+	}
+	if defaultCred != nil {
+		return defaultCred.Username, defaultCred.Password, true
+	}
+	return "", "", false
+}
+
+func (c *MySQLClient) GetTopQueryStats(ctx context.Context, endpoint string, port int32, clusterIdentifier string, topN int) ([]QueryStats, error) {
+	username, password, found := c.GetCredentialsForCluster(clusterIdentifier)
+	if !found {
+		return nil, fmt.Errorf("no credentials configured for cluster %s", clusterIdentifier)
+	}
+
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/performance_schema?timeout=%s&readTimeout=%s",
-		c.username, c.password, endpoint, port, c.timeout, c.timeout)
+		username, password, endpoint, port, c.timeout, c.timeout)
 
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {

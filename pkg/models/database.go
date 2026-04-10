@@ -18,8 +18,9 @@ type Instance struct {
 
 func (instance Instance) GetFilterableFields() map[string]string {
 	return map[string]string{
-		"identifier": instance.Identifier,
-		"engine":     string(instance.Engine),
+		"identifier":         instance.Identifier,
+		"cluster_identifier": instance.ClusterIdentifier,
+		"engine":             string(instance.Engine),
 	}
 }
 

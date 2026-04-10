@@ -27,8 +27,15 @@ type DimensionsConfig struct {
 }
 
 type QueryMetricsConfig struct {
-	Enabled bool `yaml:"enabled"`
-	TopN    int  `yaml:"top-n"`
+	Enabled     bool                    `yaml:"enabled"`
+	TopN        int                     `yaml:"top-n"`
+	Credentials []QueryCredentialConfig `yaml:"credentials,omitempty"`
+}
+
+type QueryCredentialConfig struct {
+	Cluster     string `yaml:"cluster"`
+	Username    string `yaml:"username"`
+	PasswordEnv string `yaml:"password-env"`
 }
 
 type ExportConfig struct {
@@ -101,8 +108,15 @@ type ParsedDimensionsConfig struct {
 }
 
 type ParsedQueryMetricsConfig struct {
-	Enabled bool
-	TopN    int
+	Enabled     bool
+	TopN        int
+	Credentials []ParsedQueryCredential
+}
+
+type ParsedQueryCredential struct {
+	Cluster  string
+	Username string
+	Password string
 }
 
 type ParsedExportConfig struct {

@@ -366,9 +366,41 @@ func parseQueryMetricsConfig(config models.QueryMetricsConfig) models.ParsedQuer
 	if config.TopN > 0 && config.TopN <= 50 {
 		topN = config.TopN
 	}
+
+	var creds []models.ParsedQueryCredential
+	for _, c := range config.Credentials {
+		password := os.Getenv(c.PasswordEnv)
+		if password == "" {
+			log.Printf("[CONFIG] Warning: environment variable %s not set for cluster %s", c.PasswordEnv, c.Cluster)
+			continue
+		}
+		creds = append(creds, models.ParsedQueryCredential{
+			Cluster:  c.Cluster,
+			Username: c.Username,
+			Password: password,
+		})
+	}
+
+	// Backwards compatibility: if no credentials configured, fall back to DB_USERNAME/DB_PASSWORD
+	if len(creds) == 0 {
+		username := os.Getenv("DB_USERNAME")
+		password := os.Getenv("DB_PASSWORD")
+		if username == "" {
+			username = "dbi_reader"
+		}
+		if password != "" {
+			creds = append(creds, models.ParsedQueryCredential{
+				Cluster:  "",
+				Username: username,
+				Password: password,
+			})
+		}
+	}
+
 	return models.ParsedQueryMetricsConfig{
-		Enabled: config.Enabled,
-		TopN:    topN,
+		Enabled:     config.Enabled && len(creds) > 0,
+		TopN:        topN,
+		Credentials: creds,
 	}
 }
 

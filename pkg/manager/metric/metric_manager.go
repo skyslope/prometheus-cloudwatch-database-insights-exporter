@@ -62,9 +62,9 @@ func NewMetricManager(pi pi.PIService, config *models.ParsedConfig, region strin
 	}
 
 	// Initialize MySQL client for query metrics
-	mysqlClient := mysql.NewMySQLClient()
+	mysqlClient := mysql.NewMySQLClient(config.Discovery.QueryMetrics.Credentials)
 	if config.Discovery.QueryMetrics.Enabled && !mysqlClient.IsConfigured() {
-		log.Printf("[METRIC MANAGER] Warning: query-metrics enabled but DB_PASSWORD not set, query metrics will be skipped")
+		log.Printf("[METRIC MANAGER] Warning: query-metrics enabled but no credentials configured, query metrics will be skipped")
 	}
 
 	return &MetricManager{
@@ -219,7 +219,7 @@ func (metricManager *MetricManager) CollectQueryMetrics(ctx context.Context, ins
 		return nil
 	}
 
-	stats, err := metricManager.mysqlClient.GetTopQueryStats(ctx, instance.Endpoint, instance.Port, qmConfig.TopN)
+	stats, err := metricManager.mysqlClient.GetTopQueryStats(ctx, instance.Endpoint, instance.Port, instance.ClusterIdentifier, qmConfig.TopN)
 	if err != nil {
 		log.Printf("[METRIC MANAGER] Error querying performance_schema on %s: %v", instance.Identifier, err)
 		return err
