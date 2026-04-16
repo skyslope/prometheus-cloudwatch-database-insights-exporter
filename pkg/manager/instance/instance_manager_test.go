@@ -41,7 +41,7 @@ func TestNewRDSInstanceManager(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			manager, err := NewRDSInstanceManager(tc.mockRDSService, tc.config)
+			manager, err := NewRDSInstanceManager(tc.mockRDSService, tc.config, "us-west-2")
 			require.NoError(t, err)
 
 			assert.NotNil(t, manager)
@@ -66,7 +66,7 @@ func TestGetInstances(t *testing.T) {
 			name: "get instances within instanceTTL",
 			setupManager: func() *RDSInstanceManager {
 				mockRDSService := &mocks.MockRDSService{}
-				manager, _ := NewRDSInstanceManager(mockRDSService, testutils.CreateDefaultParsedTestConfig())
+				manager, _ := NewRDSInstanceManager(mockRDSService, testutils.CreateDefaultParsedTestConfig(), "us-west-2")
 				manager.Instances = testutils.TestInstances
 				manager.InstancesLastUpdated = time.Now()
 				return manager
@@ -80,7 +80,7 @@ func TestGetInstances(t *testing.T) {
 			name: "get instances with expired cache success",
 			setupManager: func() *RDSInstanceManager {
 				mockRDSService := &mocks.MockRDSService{}
-				manager, _ := NewRDSInstanceManager(mockRDSService, testutils.CreateDefaultParsedTestConfig())
+				manager, _ := NewRDSInstanceManager(mockRDSService, testutils.CreateDefaultParsedTestConfig(), "us-west-2")
 				return manager
 			},
 			mockResponse:  mocks.NewMockRDSDescribeInstances(),
@@ -92,7 +92,7 @@ func TestGetInstances(t *testing.T) {
 			name: "get instances with expired cache error",
 			setupManager: func() *RDSInstanceManager {
 				mockRDSService := &mocks.MockRDSService{}
-				manager, _ := NewRDSInstanceManager(mockRDSService, testutils.CreateDefaultParsedTestConfig())
+				manager, _ := NewRDSInstanceManager(mockRDSService, testutils.CreateDefaultParsedTestConfig(), "us-west-2")
 				return manager
 			},
 			mockResponse:  nil,
@@ -104,7 +104,7 @@ func TestGetInstances(t *testing.T) {
 			name: "get instances with no cached data and empty RDS response",
 			setupManager: func() *RDSInstanceManager {
 				mockRDSService := &mocks.MockRDSService{}
-				manager, _ := NewRDSInstanceManager(mockRDSService, testutils.CreateDefaultParsedTestConfig())
+				manager, _ := NewRDSInstanceManager(mockRDSService, testutils.CreateDefaultParsedTestConfig(), "us-west-2")
 				return manager
 			},
 			mockResponse:  mocks.NewMockRDSDescribeInstancesEmpty(),
@@ -116,7 +116,7 @@ func TestGetInstances(t *testing.T) {
 			name: "get instances limits to maxInstances = 1 when more available",
 			setupManager: func() *RDSInstanceManager {
 				mockRDSService := &mocks.MockRDSService{}
-				manager, _ := NewRDSInstanceManager(mockRDSService, testutils.CreateParsedTestConfig(1))
+				manager, _ := NewRDSInstanceManager(mockRDSService, testutils.CreateParsedTestConfig(1), "us-west-2")
 				return manager
 			},
 			mockResponse:  mocks.NewMockRDSDescribeInstances(),
@@ -128,7 +128,7 @@ func TestGetInstances(t *testing.T) {
 			name: "get instances returns all when fewer than maxInstances",
 			setupManager: func() *RDSInstanceManager {
 				mockRDSService := &mocks.MockRDSService{}
-				manager, _ := NewRDSInstanceManager(mockRDSService, testutils.CreateParsedTestConfig(testutils.TestMaxInstances/2))
+				manager, _ := NewRDSInstanceManager(mockRDSService, testutils.CreateParsedTestConfig(testutils.TestMaxInstances/2), "us-west-2")
 				return manager
 			},
 			mockResponse:  mocks.NewMockRDSDescribeInstances(),
@@ -140,7 +140,7 @@ func TestGetInstances(t *testing.T) {
 			name: "get instances with maxInstances = 0 (edge case) returns none",
 			setupManager: func() *RDSInstanceManager {
 				mockRDSService := &mocks.MockRDSService{}
-				manager, _ := NewRDSInstanceManager(mockRDSService, testutils.CreateParsedTestConfig(0))
+				manager, _ := NewRDSInstanceManager(mockRDSService, testutils.CreateParsedTestConfig(0), "us-west-2")
 				return manager
 			},
 			mockResponse:  mocks.NewMockRDSDescribeInstances(),
@@ -237,7 +237,7 @@ func TestDiscoverInstances(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			mockRDS := &mocks.MockRDSService{}
-			manager, _ := NewRDSInstanceManager(mockRDS, testutils.CreateDefaultParsedTestConfig())
+			manager, _ := NewRDSInstanceManager(mockRDS, testutils.CreateDefaultParsedTestConfig(), "us-west-2")
 
 			if tc.shouldCallRDS {
 				mockRDS.On("DescribeDBInstancesPaginator", mock.Anything).

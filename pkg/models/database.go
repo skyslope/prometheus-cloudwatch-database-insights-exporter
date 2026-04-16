@@ -8,6 +8,7 @@ type Instance struct {
 	ResourceID        string
 	Identifier        string
 	ClusterIdentifier string
+	Region            string
 	Endpoint          string
 	Port              int32
 	Engine            Engine

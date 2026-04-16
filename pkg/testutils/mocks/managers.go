@@ -51,3 +51,13 @@ func (mockMetricProvider *MockMetricProvider) CollectMetricsForBatch(ctx context
 	args := mockMetricProvider.Called(ctx, instance, metricsBatch, ch)
 	return args.Error(0)
 }
+
+func (mockMetricProvider *MockMetricProvider) CollectDimensionMetrics(ctx context.Context, instance models.Instance, ch chan<- prometheus.Metric) error {
+	args := mockMetricProvider.Called(ctx, instance, ch)
+	return args.Error(0)
+}
+
+func (mockMetricProvider *MockMetricProvider) CollectQueryMetrics(ctx context.Context, instance models.Instance, ch chan<- prometheus.Metric) error {
+	args := mockMetricProvider.Called(ctx, instance, ch)
+	return args.Error(0)
+}

@@ -125,12 +125,7 @@ func applyDefaults(config *models.Config) {
 func parsedValidateConfig(config *models.Config) (*models.ParsedConfig, error) {
 	var parsedConfig models.ParsedConfig
 
-	if len(config.Discovery.Regions) > 1 {
-		// Current version only supports single region exporter
-		parsedConfig.Discovery.Regions = []string{config.Discovery.Regions[0]}
-	} else {
-		parsedConfig.Discovery.Regions = config.Discovery.Regions
-	}
+	parsedConfig.Discovery.Regions = config.Discovery.Regions
 
 	instancesConfig, err := parseInstancesConfig(config.Discovery.Instances)
 	if err != nil {

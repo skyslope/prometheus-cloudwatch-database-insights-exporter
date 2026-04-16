@@ -45,7 +45,7 @@ func (factory *RegionManagerFactory) createSingleRegionManager(region string, co
 		return nil, err
 	}
 
-	rdsInstanceManager, err := instance.NewRDSInstanceManager(rdsClient, config)
+	rdsInstanceManager, err := instance.NewRDSInstanceManager(rdsClient, config, region)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create RDS instance manager: %w", err)
 	}

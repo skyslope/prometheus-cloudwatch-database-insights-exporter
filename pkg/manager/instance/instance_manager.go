@@ -24,6 +24,7 @@ const (
 
 type RDSInstanceManager struct {
 	rdsService           rds.RDSService
+	region               string
 	Instances            []models.Instance
 	InstancesLastUpdated time.Time
 	InstanceTTL          time.Duration
@@ -45,12 +46,13 @@ type SafeInstanceFields struct {
 
 // RDSInstanceManager handles discovery and caching of RDS database instances within a region.
 // It provides instance discovery with TTL-based caching to minimize AWS API calls while ensuring data freshness for metric collection operations.
-func NewRDSInstanceManager(rds rds.RDSService, config *models.ParsedConfig) (*RDSInstanceManager, error) {
+func NewRDSInstanceManager(rds rds.RDSService, config *models.ParsedConfig, region string) (*RDSInstanceManager, error) {
 	if config == nil {
 		return nil, fmt.Errorf("configuration parameter cannot be nil")
 	}
 	return &RDSInstanceManager{
 		rdsService:    rds,
+		region:        region,
 		InstanceTTL:   config.Discovery.Instances.CacheTTL,
 		MetadataTTL:   config.Discovery.Metrics.MetadataCacheTTL,
 		configuration: config,
@@ -123,6 +125,7 @@ func (instanceManager *RDSInstanceManager) discoverInstances(ctx context.Context
 				ResourceID:        instanceFields.DbiResourceId,
 				Identifier:        instanceFields.DBInstanceIdentifier,
 				ClusterIdentifier: instanceFields.DBClusterIdentifier,
+				Region:            instanceManager.region,
 				Endpoint:          instanceFields.Endpoint,
 				Port:              instanceFields.Port,
 				Engine:            engine,

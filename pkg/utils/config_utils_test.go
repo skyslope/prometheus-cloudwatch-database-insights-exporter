@@ -55,7 +55,7 @@ export:
 			},
 		},
 		{
-			name: "load config with multiple regions (only first is used)",
+			name: "load config with multiple regions (all preserved)",
 			configContent: `discovery:
   regions:
   - us-east-1
@@ -67,7 +67,7 @@ export:
   port: 8081`,
 			expectedError: false,
 			validate: func(t *testing.T, cfg *models.ParsedConfig) {
-				assert.Equal(t, []string{"us-east-1"}, cfg.Discovery.Regions)
+				assert.Equal(t, []string{"us-east-1", "us-east-1", "eu-west-1"}, cfg.Discovery.Regions)
 			},
 		},
 		{
@@ -362,7 +362,7 @@ func TestParsedValidateConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "valid config with multiple regions (only first used)",
+			name: "valid config with multiple regions (all preserved)",
 			config: testutils.CreateTestConfig(map[string]interface{}{
 				"statistic": "max",
 				"port":      8082,
@@ -370,7 +370,7 @@ func TestParsedValidateConfig(t *testing.T) {
 			}),
 			expectedError: false,
 			validate: func(t *testing.T, cfg *models.ParsedConfig) {
-				assert.Equal(t, []string{"us-east-1"}, cfg.Discovery.Regions)
+				assert.Equal(t, []string{"us-east-1", "us-east-1", "eu-west-1"}, cfg.Discovery.Regions)
 				assert.Equal(t, models.StatisticMax, cfg.Discovery.Metrics.Statistic)
 				assert.Equal(t, 8082, cfg.Export.Port)
 			},

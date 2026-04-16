@@ -125,6 +125,10 @@ func TestCollectMetrics(t *testing.T) {
 						mockMP.On("CollectMetricsForBatch", mock.Anything, instance, mock.Anything, mock.Anything).
 							Return(nil).Maybe()
 					}
+
+					// CollectDimensionMetrics and CollectQueryMetrics called after main collection succeeds
+					mockMP.On("CollectDimensionMetrics", mock.Anything, instance, mock.Anything).Return(nil).Maybe()
+					mockMP.On("CollectQueryMetrics", mock.Anything, instance, mock.Anything).Return(nil).Maybe()
 				}
 			}
 
@@ -440,6 +444,9 @@ func TestCollectMetricsWithQueue(t *testing.T) {
 						}
 					}
 				}
+				// CollectDimensionMetrics and CollectQueryMetrics called after main collection
+				mockMP.On("CollectDimensionMetrics", mock.Anything, instance, mock.Anything).Return(nil).Maybe()
+				mockMP.On("CollectQueryMetrics", mock.Anything, instance, mock.Anything).Return(nil).Maybe()
 			}
 
 			ch := make(chan prometheus.Metric, 100)

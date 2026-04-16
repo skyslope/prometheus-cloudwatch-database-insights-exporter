@@ -494,8 +494,9 @@ func TestInstanceGetFilterableFields(t *testing.T) {
 				Engine:     PostgreSQL,
 			},
 			expected: map[string]string{
-				"identifier": "test-postgres-db",
-				"engine":     "postgres",
+				"identifier":         "test-postgres-db",
+				"cluster_identifier": "",
+				"engine":             "postgres",
 			},
 		},
 		{
@@ -506,8 +507,9 @@ func TestInstanceGetFilterableFields(t *testing.T) {
 				Engine:     MySQL,
 			},
 			expected: map[string]string{
-				"identifier": "test-mysql-db",
-				"engine":     "mysql",
+				"identifier":         "test-mysql-db",
+				"cluster_identifier": "",
+				"engine":             "mysql",
 			},
 		},
 		{
@@ -518,8 +520,9 @@ func TestInstanceGetFilterableFields(t *testing.T) {
 				Engine:     AuroraPostgreSQL,
 			},
 			expected: map[string]string{
-				"identifier": "aurora-postgres-cluster",
-				"engine":     "aurora-postgresql",
+				"identifier":         "aurora-postgres-cluster",
+				"cluster_identifier": "",
+				"engine":             "aurora-postgresql",
 			},
 		},
 		{
@@ -530,8 +533,9 @@ func TestInstanceGetFilterableFields(t *testing.T) {
 				Engine:     PostgreSQL,
 			},
 			expected: map[string]string{
-				"identifier": "",
-				"engine":     "postgres",
+				"identifier":         "",
+				"cluster_identifier": "",
+				"engine":             "postgres",
 			},
 		},
 	}

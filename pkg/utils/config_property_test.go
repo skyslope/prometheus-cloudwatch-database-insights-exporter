@@ -47,14 +47,14 @@ func TestProperty_InvalidYAMLRejection(t *testing.T) {
 	properties.TestingRun(t)
 }
 
-// Property 2: Multi-region first selection
-// Validates: Requirements 1.4
-func TestProperty_MultiRegionFirstSelection(t *testing.T) {
+// Property 2: Multi-region preservation
+// Validates that all configured regions are preserved in the parsed config
+func TestProperty_MultiRegionPreservation(t *testing.T) {
 	parameters := gopter.DefaultTestParameters()
 	parameters.MinSuccessfulTests = 100
 	properties := gopter.NewProperties(parameters)
 
-	properties.Property("LoadConfig selects first region when multiple provided", prop.ForAll(
+	properties.Property("LoadConfig preserves all regions when multiple provided", prop.ForAll(
 		func(regions []string) bool {
 			if len(regions) < 2 {
 				return true // Skip if less than 2 regions
@@ -78,8 +78,8 @@ func TestProperty_MultiRegionFirstSelection(t *testing.T) {
 				return false
 			}
 
-			// Should only have first region
-			return len(config.Discovery.Regions) == 1 && config.Discovery.Regions[0] == regions[0]
+			// All regions should be preserved
+			return len(config.Discovery.Regions) == len(regions)
 		},
 		gen.SliceOfN(5, gen.OneConstOf("us-east-1", "us-west-2", "eu-west-1", "ap-southeast-1", "ca-central-1")),
 	))

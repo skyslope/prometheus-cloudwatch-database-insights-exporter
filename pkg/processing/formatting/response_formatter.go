@@ -21,7 +21,7 @@ func ConvertToPrometheusMetric(ch chan<- prometheus.Metric, instance models.Inst
 		return err
 	}
 
-	metricLabels := []string{"identifier", "cluster_identifier", "engine", "unit"}
+	metricLabels := []string{"identifier", "cluster_identifier", "region", "engine", "unit"}
 
 	engineShortStr := utils.EngineToShortName(instance.Engine)
 	prometheusDesc := buildPrometheusDescription(
@@ -36,6 +36,7 @@ func ConvertToPrometheusMetric(ch chan<- prometheus.Metric, instance models.Inst
 		metricData.Value,
 		instance.Identifier,
 		instance.ClusterIdentifier,
+		instance.Region,
 		string(instance.Engine),
 		metric.Unit,
 	)
@@ -83,20 +84,22 @@ func ConvertDimensionToPrometheusMetric(ch chan<- prometheus.Metric, instance mo
 	switch data.Group {
 	case "db.sql_tokenized":
 		metricName = metricPrefix + "_" + engineShortStr + "_top_sql_load_avg"
-		labels = []string{"identifier", "cluster_identifier", "engine", "digest", "statement"}
+		labels = []string{"identifier", "cluster_identifier", "region", "engine", "digest", "statement"}
 		labelValues = []string{
 			instance.Identifier,
 			instance.ClusterIdentifier,
+			instance.Region,
 			string(instance.Engine),
 			data.Dimensions["db.sql_tokenized.id"],
 			truncateLabel(data.Dimensions["db.sql_tokenized.statement"], 200),
 		}
 	case "db.wait_event":
 		metricName = metricPrefix + "_" + engineShortStr + "_wait_event_load_avg"
-		labels = []string{"identifier", "cluster_identifier", "engine", "wait_event", "wait_type"}
+		labels = []string{"identifier", "cluster_identifier", "region", "engine", "wait_event", "wait_type"}
 		labelValues = []string{
 			instance.Identifier,
 			instance.ClusterIdentifier,
+			instance.Region,
 			string(instance.Engine),
 			data.Dimensions["db.wait_event.name"],
 			data.Dimensions["db.wait_event.type"],
@@ -115,10 +118,10 @@ func ConvertDimensionToPrometheusMetric(ch chan<- prometheus.Metric, instance mo
 	return nil
 }
 
-func ConvertQueryStatsToPrometheusMetrics(ch chan<- prometheus.Metric, identifier string, clusterIdentifier string, engine string, metricPrefix string, digest string, statement string, calls int64, avgDurationMs float64, lockTimeMs float64, rowsExamined int64, rowsSent int64, errors int64) {
+func ConvertQueryStatsToPrometheusMetrics(ch chan<- prometheus.Metric, identifier string, clusterIdentifier string, region string, engine string, metricPrefix string, digest string, statement string, calls int64, avgDurationMs float64, lockTimeMs float64, rowsExamined int64, rowsSent int64, errors int64) {
 	engineShort := utils.EngineToShortName(models.Engine(engine))
-	labels := []string{"identifier", "cluster_identifier", "engine", "digest", "statement"}
-	labelValues := []string{identifier, clusterIdentifier, engine, digest, truncateLabel(statement, 200)}
+	labels := []string{"identifier", "cluster_identifier", "region", "engine", "digest", "statement"}
+	labelValues := []string{identifier, clusterIdentifier, region, engine, digest, truncateLabel(statement, 200)}
 
 	metrics := []struct {
 		name  string
