@@ -5,7 +5,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -o dbinsights-exporter ./cmd
 
-FROM alpine:3.19
+FROM alpine:3.22
 RUN apk add --no-cache ca-certificates
 COPY --from=builder /app/dbinsights-exporter /bin/dbinsights-exporter
 EXPOSE 8081
