@@ -12,3 +12,4 @@ coverage.out
 coverage.html
 config.yml
 /.kiro/
+.claude/
