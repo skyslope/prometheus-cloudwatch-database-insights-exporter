@@ -3,7 +3,6 @@ package sql
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/models"
 )
@@ -49,15 +48,21 @@ func (c *Client) IsConfigured() bool {
 }
 
 // GetTopQueryStats routes to the appropriate engine-specific client based on instance.Engine.
-// Returns an error for unsupported engines (Oracle, SQL Server, etc.).
+// Returns (nil, nil) silently when no credentials are configured for the cluster (expected
+// state - means we don't want to collect query metrics for that cluster) or when the engine
+// is unsupported.
 func (c *Client) GetTopQueryStats(ctx context.Context, instance models.Instance, topN int) ([]QueryStats, error) {
+	// Silently skip if no credentials match this cluster
+	if _, _, found := getCredentialsForCluster(c.credentials, instance.ClusterIdentifier); !found {
+		return nil, nil
+	}
+
 	switch instance.Engine {
 	case models.MySQL, models.AuroraMySQL, models.MariaDB:
 		return c.mysql.GetTopQueryStats(ctx, instance.Endpoint, instance.Port, instance.ClusterIdentifier, topN)
 	case models.PostgreSQL, models.AuroraPostgreSQL:
 		return c.postgres.GetTopQueryStats(ctx, instance.Endpoint, instance.Port, instance.ClusterIdentifier, topN)
 	default:
-		log.Printf("[SQL] Engine %s does not support query-level metrics", instance.Engine)
 		return nil, fmt.Errorf("unsupported engine for query metrics: %s", instance.Engine)
 	}
 }

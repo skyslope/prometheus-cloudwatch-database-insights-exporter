@@ -208,7 +208,9 @@ func (metricManager *MetricManager) CollectDimensionMetrics(ctx context.Context,
 	return nil
 }
 
-// CollectQueryMetrics queries performance_schema directly for per-query stats.
+// CollectQueryMetrics queries the engine-specific stats view (performance_schema for MySQL,
+// pg_stat_statements for Postgres) for per-query metrics. Silently skipped for clusters
+// without configured credentials or unsupported engines.
 func (metricManager *MetricManager) CollectQueryMetrics(ctx context.Context, instance models.Instance, ch chan<- prometheus.Metric) error {
 	qmConfig := metricManager.configuration.Discovery.QueryMetrics
 	if !qmConfig.Enabled || !metricManager.sqlClient.IsConfigured() {
@@ -221,7 +223,7 @@ func (metricManager *MetricManager) CollectQueryMetrics(ctx context.Context, ins
 
 	stats, err := metricManager.sqlClient.GetTopQueryStats(ctx, instance, qmConfig.TopN)
 	if err != nil {
-		log.Printf("[METRIC MANAGER] Error querying performance_schema on %s: %v", instance.Identifier, err)
+		log.Printf("[METRIC MANAGER] Error collecting query metrics for %s (%s): %v", instance.Identifier, instance.Engine, err)
 		return err
 	}
 
