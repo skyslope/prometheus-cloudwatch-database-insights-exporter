@@ -11,7 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/cache"
-	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/clients/mysql"
+	sqlclient "github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/clients/sql"
 	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/clients/pi"
 	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/models"
 	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/processing/formatting"
@@ -25,7 +25,7 @@ const (
 
 type MetricManager struct {
 	piService        pi.PIService
-	mysqlClient      *mysql.MySQLClient
+	sqlClient        *sqlclient.Client
 	configuration    *models.ParsedConfig
 	registry         *utils.PerEngineMetricRegistry
 	metricDataCache  cache.MetricCache
@@ -61,15 +61,15 @@ func NewMetricManager(pi pi.PIService, config *models.ParsedConfig, region strin
 		return nil, fmt.Errorf("failed to create TTL policy manager: %w", err)
 	}
 
-	// Initialize MySQL client for query metrics
-	mysqlClient := mysql.NewMySQLClient(config.Discovery.QueryMetrics.Credentials)
-	if config.Discovery.QueryMetrics.Enabled && !mysqlClient.IsConfigured() {
+	// Initialize SQL client for query metrics (dispatches to mysql/postgres based on engine)
+	sqlClient := sqlclient.NewClient(config.Discovery.QueryMetrics.Credentials)
+	if config.Discovery.QueryMetrics.Enabled && !sqlClient.IsConfigured() {
 		log.Printf("[METRIC MANAGER] Warning: query-metrics enabled but no credentials configured, query metrics will be skipped")
 	}
 
 	return &MetricManager{
 		piService:        pi,
-		mysqlClient:      mysqlClient,
+		sqlClient:        sqlClient,
 		configuration:    config,
 		registry:         utils.NewPerEngineMetricRegistry(),
 		metricDataCache:  metricDataCache,
@@ -211,7 +211,7 @@ func (metricManager *MetricManager) CollectDimensionMetrics(ctx context.Context,
 // CollectQueryMetrics queries performance_schema directly for per-query stats.
 func (metricManager *MetricManager) CollectQueryMetrics(ctx context.Context, instance models.Instance, ch chan<- prometheus.Metric) error {
 	qmConfig := metricManager.configuration.Discovery.QueryMetrics
-	if !qmConfig.Enabled || !metricManager.mysqlClient.IsConfigured() {
+	if !qmConfig.Enabled || !metricManager.sqlClient.IsConfigured() {
 		return nil
 	}
 
@@ -219,7 +219,7 @@ func (metricManager *MetricManager) CollectQueryMetrics(ctx context.Context, ins
 		return nil
 	}
 
-	stats, err := metricManager.mysqlClient.GetTopQueryStats(ctx, instance.Endpoint, instance.Port, instance.ClusterIdentifier, qmConfig.TopN)
+	stats, err := metricManager.sqlClient.GetTopQueryStats(ctx, instance, qmConfig.TopN)
 	if err != nil {
 		log.Printf("[METRIC MANAGER] Error querying performance_schema on %s: %v", instance.Identifier, err)
 		return err

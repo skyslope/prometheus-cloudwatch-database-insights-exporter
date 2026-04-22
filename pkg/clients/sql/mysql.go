@@ -1,4 +1,4 @@
-package mysql
+package sql
 
 import (
 	"context"
@@ -12,17 +12,6 @@ import (
 	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/models"
 )
 
-type QueryStats struct {
-	Digest           string
-	DigestText       string
-	Calls            int64
-	AvgDurationMs    float64
-	SumLockTimeMs    float64
-	SumRowsExamined  int64
-	SumRowsSent      int64
-	SumErrors        int64
-}
-
 type MySQLClient struct {
 	credentials []models.ParsedQueryCredential
 	timeout     time.Duration
@@ -35,31 +24,8 @@ func NewMySQLClient(credentials []models.ParsedQueryCredential) *MySQLClient {
 	}
 }
 
-func (c *MySQLClient) IsConfigured() bool {
-	return len(c.credentials) > 0
-}
-
-// GetCredentialsForCluster returns the username/password for a given cluster.
-// If a specific cluster match is found, use it. Otherwise fall back to the
-// default credential (empty cluster name) if one exists.
-func (c *MySQLClient) GetCredentialsForCluster(clusterIdentifier string) (string, string, bool) {
-	var defaultCred *models.ParsedQueryCredential
-	for i := range c.credentials {
-		if c.credentials[i].Cluster == clusterIdentifier {
-			return c.credentials[i].Username, c.credentials[i].Password, true
-		}
-		if c.credentials[i].Cluster == "" {
-			defaultCred = &c.credentials[i]
-		}
-	}
-	if defaultCred != nil {
-		return defaultCred.Username, defaultCred.Password, true
-	}
-	return "", "", false
-}
-
 func (c *MySQLClient) GetTopQueryStats(ctx context.Context, endpoint string, port int32, clusterIdentifier string, topN int) ([]QueryStats, error) {
-	username, password, found := c.GetCredentialsForCluster(clusterIdentifier)
+	username, password, found := getCredentialsForCluster(c.credentials, clusterIdentifier)
 	if !found {
 		return nil, fmt.Errorf("no credentials configured for cluster %s", clusterIdentifier)
 	}
