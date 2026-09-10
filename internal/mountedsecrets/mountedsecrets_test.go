@@ -25,6 +25,15 @@ func (f failingFS) Open(name string) (fs.File, error) {
 }
 func (f failingFS) Stat(name string) (fs.FileInfo, error) { return fs.Stat(f.FS, name) }
 
+type failedStatFS struct{ fs.FS }
+
+func (f failedStatFS) Stat(name string) (fs.FileInfo, error) {
+	if name == "db" {
+		return nil, fs.ErrPermission
+	}
+	return fs.Stat(f.FS, name)
+}
+
 func TestContract(t *testing.T) {
 	data := func(s string) *fstest.MapFile { return &fstest.MapFile{Data: []byte(s)} }
 	for _, tc := range []struct {
@@ -40,8 +49,10 @@ func TestContract(t *testing.T) {
 		{"sorted directories", fstest.MapFS{"z/MSTEST_KEY": data("last"), "a/MSTEST_KEY": data("first")}, nil, map[string]string{"MSTEST_KEY": "first"}, ""},
 		{"skip hidden and deeper", fstest.MapFS{".hidden": data("hidden-secret"), "db/.hidden": data("hidden-secret"), "db/deeper/MSTEST_KEY": data("deep-secret")}, nil, map[string]string{}, ""},
 		{"unreadable dynamic", failingFS{fstest.MapFS{"MSTEST_KEY": data("stale-secret"), "db/MSTEST_KEY": data("file-secret"), "OTHER": data("ok")}, "db/MSTEST_KEY"}, nil, map[string]string{"OTHER": "ok"}, "MSTEST_KEY left unset"},
+		{"uninspectable root entry", failedStatFS{fstest.MapFS{"MSTEST_KEY": data("stale-secret"), "db/MSTEST_KEY": data("file-secret")}}, nil, map[string]string{}, "cannot inspect"},
 		{"unreadable root", failingFS{fstest.MapFS{"MSTEST_KEY": data("file-secret")}, "."}, nil, map[string]string{}, "cannot list"},
-		{"unreadable subdir", failingFS{fstest.MapFS{"db/MSTEST_KEY": data("file-secret"), "OTHER": data("ok")}, "db"}, nil, map[string]string{"OTHER": "ok"}, "cannot list"},
+		{"failed scan blocks all fallback", failingFS{fstest.MapFS{"MSTEST_KEY": data("stale-secret"), "a/MSTEST_KEY": data("file-secret"), "z/MSTEST_KEY": data("file-secret")}, "z"}, map[string]string{"EXISTING": "env-secret"}, map[string]string{"EXISTING": "env-secret"}, "cannot list"},
+		{"unreadable subdir", failingFS{fstest.MapFS{"db/MSTEST_KEY": data("file-secret"), "OTHER": data("ok")}, "db"}, nil, map[string]string{}, "cannot list"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			env := map[string]string{}

@@ -8,6 +8,8 @@ this mount exists. Without it, startup behavior is unchanged.
 - Files one directory below the root load before top-level static KV files.
 - Entries are sorted; first writer wins. Hidden entries and deeper directories are skipped.
 - Unreadable dynamic keys remain claimed, so stale static values cannot replace them.
+- Directory discovery completes before loading any files. If a directory cannot be
+  inspected/listed, no mounted values load; existing environment values remain intact.
 - Filesystem failures warn without aborting bootstrap. Warnings contain names and paths,
   never values or exception messages that could contain values.
 - Values are trimmed. Whitespace-sensitive values require review before cutover.

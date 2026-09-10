@@ -30,10 +30,12 @@ func load(files fs.FS, root string, lookup func(string) (string, bool), set func
 		warn("[mounted-secrets] not a directory: %s", root)
 		return
 	}
+	scanFailed := false
 	list := func(dir string) []fs.DirEntry {
 		entries, err := fs.ReadDir(files, dir)
 		if err != nil {
-			warn("[mounted-secrets] cannot list %s", filepath.Join(root, dir))
+			scanFailed = true
+			warn("[mounted-secrets] cannot list %s; skipping mounted files", filepath.Join(root, dir))
 			return nil
 		}
 		sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
@@ -59,7 +61,7 @@ func load(files fs.FS, root string, lookup func(string) (string, bool), set func
 		}
 	}
 	entries := list(".")
-	var static []string
+	var static, dynamic []string
 	for _, entry := range entries {
 		name := entry.Name()
 		if strings.HasPrefix(name, ".") {
@@ -68,8 +70,8 @@ func load(files fs.FS, root string, lookup func(string) (string, bool), set func
 		// Stat follows Kubernetes projected-volume symlinks, unlike IsDir.
 		info, err := fs.Stat(files, name)
 		if err != nil {
-			warn("[mounted-secrets] cannot inspect %s", filepath.Join(root, name))
-			continue
+			warn("[mounted-secrets] cannot inspect %s; skipping mounted files", filepath.Join(root, name))
+			return
 		}
 		if !info.IsDir() {
 			if info.Mode().IsRegular() {
@@ -78,20 +80,26 @@ func load(files fs.FS, root string, lookup func(string) (string, bool), set func
 			continue
 		}
 		for _, child := range list(name) {
-			key := child.Name()
-			if strings.HasPrefix(key, ".") {
-				continue
+			if !strings.HasPrefix(child.Name(), ".") {
+				dynamic = append(dynamic, path.Join(name, child.Name()))
 			}
-			file := path.Join(name, key)
-			info, err := fs.Stat(files, file)
-			if err != nil {
-				claimed[key] = true
-				warn("[mounted-secrets] cannot inspect %s; %s left unset", filepath.Join(root, file), key)
-				continue
-			}
-			if info.Mode().IsRegular() {
-				read(file, key)
-			}
+		}
+	}
+	// Discover all dynamic keys before writing any environment values. An
+	// incomplete directory scan cannot safely fall back to another source.
+	if scanFailed {
+		return
+	}
+	for _, file := range dynamic {
+		key := path.Base(file)
+		info, err := fs.Stat(files, file)
+		if err != nil {
+			claimed[key] = true
+			warn("[mounted-secrets] cannot inspect %s; %s left unset", filepath.Join(root, file), key)
+			continue
+		}
+		if info.Mode().IsRegular() {
+			read(file, key)
 		}
 	}
 	for _, name := range static {
