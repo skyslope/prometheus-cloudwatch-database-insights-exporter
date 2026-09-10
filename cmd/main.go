@@ -11,6 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/internal/mountedsecrets"
 	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/collector"
 	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/manager/region"
 	"github.com/awslabs/prometheus-cloudwatch-database-insights-exporter/pkg/utils"
@@ -23,6 +24,8 @@ const (
 )
 
 func main() {
+	// Load before configuration reads the environment. Existing env always wins.
+	mountedsecrets.Load("/opt/secrets")
 	// Parse command-line flags
 	configPath := flag.String("config", "config.yml", "Path to configuration file")
 	debugFlag := flag.Bool("debug", false, "Enable debug logging for cache operations")
