@@ -15,6 +15,9 @@ import (
 // Dynamic files one level below root take precedence over top-level KV files.
 // Missing mounts are a no-op; failures warn without logging secret contents.
 func Load(root string) {
+	if strings.TrimSpace(root) == "" {
+		return
+	}
 	load(os.DirFS(root), root, os.LookupEnv, os.Setenv, log.Printf)
 }
 
@@ -35,7 +38,7 @@ func load(files fs.FS, root string, lookup func(string) (string, bool), set func
 		entries, err := fs.ReadDir(files, dir)
 		if err != nil {
 			scanFailed = true
-			warn("[mounted-secrets] cannot list %s; skipping mounted files", filepath.Join(root, dir))
+			warn("[mounted-secrets] cannot list %s; aborting entire mounted-secret load", filepath.Join(root, dir))
 			return nil
 		}
 		sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
@@ -48,7 +51,6 @@ func load(files fs.FS, root string, lookup func(string) (string, bool), set func
 		}
 		claimed[key] = true // Claim before reading: never fall back to stale KV.
 		if _, exists := lookup(key); exists {
-			warn("[mounted-secrets] %s already set; ignoring %s", key, filepath.Join(root, name))
 			return
 		}
 		value, err := fs.ReadFile(files, name)
@@ -70,7 +72,7 @@ func load(files fs.FS, root string, lookup func(string) (string, bool), set func
 		// Stat follows Kubernetes projected-volume symlinks, unlike IsDir.
 		info, err := fs.Stat(files, name)
 		if err != nil {
-			warn("[mounted-secrets] cannot inspect %s; skipping mounted files", filepath.Join(root, name))
+			warn("[mounted-secrets] cannot inspect %s; aborting entire mounted-secret load", filepath.Join(root, name))
 			return
 		}
 		if !info.IsDir() {
@@ -92,15 +94,25 @@ func load(files fs.FS, root string, lookup func(string) (string, bool), set func
 	}
 	for _, file := range dynamic {
 		key := path.Base(file)
+		if claimed[key] {
+			continue
+		}
+		if _, exists := lookup(key); exists {
+			claimed[key] = true
+			continue
+		}
 		info, err := fs.Stat(files, file)
 		if err != nil {
 			claimed[key] = true
 			warn("[mounted-secrets] cannot inspect %s; %s left unset", filepath.Join(root, file), key)
 			continue
 		}
-		if info.Mode().IsRegular() {
-			read(file, key)
+		if !info.Mode().IsRegular() {
+			claimed[key] = true
+			warn("[mounted-secrets] not a regular file: %s; %s left unset", filepath.Join(root, file), key)
+			continue
 		}
+		read(file, key)
 	}
 	for _, name := range static {
 		read(name, name)

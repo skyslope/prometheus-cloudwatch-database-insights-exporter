@@ -25,6 +25,15 @@ func (f failingFS) Open(name string) (fs.File, error) {
 }
 func (f failingFS) Stat(name string) (fs.FileInfo, error) { return fs.Stat(f.FS, name) }
 
+type failedChildStatFS struct{ fs.FS }
+
+func (f failedChildStatFS) Stat(name string) (fs.FileInfo, error) {
+	if name == "db/MSTEST_KEY" {
+		return nil, fs.ErrPermission
+	}
+	return fs.Stat(f.FS, name)
+}
+
 type failedStatFS struct{ fs.FS }
 
 func (f failedStatFS) Stat(name string) (fs.FileInfo, error) {
@@ -42,12 +51,16 @@ func TestContract(t *testing.T) {
 		env, want map[string]string
 		warning   string
 	}{
+		{"invalid dynamic blocks static", fstest.MapFS{"MSTEST_KEY": data("stale-secret"), "db/MSTEST_KEY/nested": data("deep-secret")}, nil, map[string]string{}, "not a regular file"},
+		{"invalid dynamic preserves empty env", fstest.MapFS{"MSTEST_KEY": data("stale-secret"), "db/MSTEST_KEY/nested": data("deep-secret")}, map[string]string{"MSTEST_KEY": ""}, map[string]string{"MSTEST_KEY": ""}, ""},
+		{"dynamic stat failure preserves env", failedChildStatFS{fstest.MapFS{"MSTEST_KEY": data("stale-secret"), "db/MSTEST_KEY": data("file-secret")}}, map[string]string{"MSTEST_KEY": "env-secret"}, map[string]string{"MSTEST_KEY": "env-secret"}, ""},
+		{"dynamic stat failure blocks only its key", failedChildStatFS{fstest.MapFS{"MSTEST_KEY": data("stale-secret"), "db/MSTEST_KEY": data("file-secret"), "OTHER": data("ok")}}, nil, map[string]string{"OTHER": "ok"}, "MSTEST_KEY left unset"},
 		{"static", fstest.MapFS{"MSTEST_KEY": data(" value\n")}, nil, map[string]string{"MSTEST_KEY": "value"}, ""},
 		{"dynamic first", fstest.MapFS{"MSTEST_KEY": data("stale"), "db/MSTEST_KEY": data("dynamic")}, nil, map[string]string{"MSTEST_KEY": "dynamic"}, ""},
-		{"env wins", fstest.MapFS{"MSTEST_KEY": data("file-secret")}, map[string]string{"MSTEST_KEY": "env-secret"}, map[string]string{"MSTEST_KEY": "env-secret"}, "already set"},
-		{"empty env wins", fstest.MapFS{"MSTEST_KEY": data("file-secret")}, map[string]string{"MSTEST_KEY": ""}, map[string]string{"MSTEST_KEY": ""}, "already set"},
+		{"env wins", fstest.MapFS{"MSTEST_KEY": data("file-secret")}, map[string]string{"MSTEST_KEY": "env-secret"}, map[string]string{"MSTEST_KEY": "env-secret"}, ""},
+		{"empty env wins", fstest.MapFS{"MSTEST_KEY": data("file-secret")}, map[string]string{"MSTEST_KEY": ""}, map[string]string{"MSTEST_KEY": ""}, ""},
 		{"sorted directories", fstest.MapFS{"z/MSTEST_KEY": data("last"), "a/MSTEST_KEY": data("first")}, nil, map[string]string{"MSTEST_KEY": "first"}, ""},
-		{"skip hidden and deeper", fstest.MapFS{".hidden": data("hidden-secret"), "db/.hidden": data("hidden-secret"), "db/deeper/MSTEST_KEY": data("deep-secret")}, nil, map[string]string{}, ""},
+		{"skip hidden and deeper", fstest.MapFS{".hidden": data("hidden-secret"), "db/.hidden": data("hidden-secret"), "db/deeper/MSTEST_KEY": data("deep-secret")}, nil, map[string]string{}, "not a regular file"},
 		{"unreadable dynamic", failingFS{fstest.MapFS{"MSTEST_KEY": data("stale-secret"), "db/MSTEST_KEY": data("file-secret"), "OTHER": data("ok")}, "db/MSTEST_KEY"}, nil, map[string]string{"OTHER": "ok"}, "MSTEST_KEY left unset"},
 		{"uninspectable root entry", failedStatFS{fstest.MapFS{"MSTEST_KEY": data("stale-secret"), "db/MSTEST_KEY": data("file-secret")}}, nil, map[string]string{}, "cannot inspect"},
 		{"unreadable root", failingFS{fstest.MapFS{"MSTEST_KEY": data("file-secret")}, "."}, nil, map[string]string{}, "cannot list"},
@@ -86,8 +99,12 @@ func TestMissingAndNonDirectoryRoot(t *testing.T) {
 	if err := os.WriteFile(file, []byte("secret"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	for _, p := range []string{filepath.Join(root, "missing"), file} {
-		Load(p) // Must not panic or create environment values.
+	for _, p := range []string{filepath.Join(root, "missing"), file, "", "  "} {
+		before := os.Environ()
+		Load(p)
+		if !reflect.DeepEqual(before, os.Environ()) {
+			t.Fatal("invalid root changed environment")
+		}
 	}
 }
 
