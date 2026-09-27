@@ -220,3 +220,17 @@ The original assessment worktree was clean. All tracked Go files were parsed by 
 During the original offline assessment, additional Go packages requiring AWS, Prometheus, or SQL dependencies could not build: the dependencies were not available, and attempts to create module-cache entries were denied. That run used `GOPROXY=off`, `GOSUMDB=off`, and `-mod=readonly`; dependencies were not downloaded and no permission escalation was attempted. HTTP/AWS-client integration tests, database connections, race detection, image builds, actual endpoint exposure, and diagram rendering were not performed. These limitations do not block this evidence-based document; they do limit runtime validation. No model refusal occurred.
 
 The completed document was reread. `git diff --check -- docs/threat-model.md` and an additional untracked-file whitespace check reported no whitespace errors. Relative to the original assessment base `ca5c62e`, the pull request added `AGENTS.md`, `CLAUDE.md`, and this threat model. Current `main` already contains `AGENTS.md` and the original threat model; this pull request adds `CLAUDE.md` and corrects this validation record, with no pre-existing dirty files to preserve.
+
+<!-- daybreak-related-source-policy:v1 -->
+## Daybreak related-source policy
+
+Daybreak reads `.s4.toml` only from the pull request's base commit. The policy
+allows the reviewer to fetch the listed SkySlope repositories on demand with
+repository-scoped, read-only credentials. The broker permits at most fifteen fetch
+attempts per review. Related source is disclosed to OpenAI and may appear in this
+repository's Actions logs and review comments. A listed branch or tag identifies
+inspected source, not the revision deployed to production. The allow-list does not
+authorize application access or isolate workflow writers who can use the
+source-reader credential outside the broker. The shared workflow's
+[threat model](https://github.com/skyslope/.github/blob/main/docs/threat-model.md)
+describes these controls and their limits.

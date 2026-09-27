@@ -1,0 +1,207 @@
+# Related-source allow-list from skyslope/.github APP_CONSTELLATIONS.md.
+# Fetch on demand; default branches do not identify production deployments.
+version = 1
+
+[sources.atlas_exporter]
+repository = "skyslope/atlas-exporter"
+ref = "refs/heads/main"
+
+[sources.base_image_exporter]
+repository = "skyslope/base-image-exporter"
+ref = "refs/heads/main"
+
+[sources.codefresh_pipelines]
+repository = "skyslope/codefresh-pipelines"
+ref = "refs/heads/master"
+
+[sources.codefresh_step_types]
+repository = "skyslope/codefresh-step-types"
+ref = "refs/heads/master"
+
+[sources.devops_aws]
+repository = "skyslope/devops-aws"
+ref = "refs/heads/master"
+
+[sources.devops_deployments]
+repository = "skyslope/devops-deployments"
+ref = "refs/heads/main"
+
+[sources.devops_tools]
+repository = "skyslope/devops-tools"
+ref = "refs/heads/master"
+
+[sources.devoptimus]
+repository = "skyslope/devoptimus"
+ref = "refs/heads/master"
+
+[sources.docker_images]
+repository = "skyslope/docker-images"
+ref = "refs/heads/master"
+
+[sources.grafana_builder]
+repository = "skyslope/grafana-builder"
+ref = "refs/heads/master"
+
+[sources.grafana_cloud_exporters]
+repository = "skyslope/grafana-cloud-exporters"
+ref = "refs/heads/main"
+
+[sources.grafana_iac]
+repository = "skyslope/grafana-iac"
+ref = "refs/heads/master"
+
+[sources.hec_forwarder]
+repository = "skyslope/hec-forwarder"
+ref = "refs/heads/master"
+
+[sources.iam_aws]
+repository = "skyslope/iam-aws"
+ref = "refs/heads/master"
+
+[sources.informant]
+repository = "skyslope/informant"
+ref = "refs/heads/master"
+
+[sources.jira_step_repo]
+repository = "skyslope/jira-step-repo"
+ref = "refs/heads/main"
+
+[sources.jira_to_codefresh]
+repository = "skyslope/jira-to-codefresh"
+ref = "refs/heads/master"
+
+[sources.jira_webhook_service]
+repository = "skyslope/jira-webhook-service"
+ref = "refs/heads/master"
+
+[sources.kops_iac]
+repository = "skyslope/kops-iac"
+ref = "refs/heads/master"
+
+[sources.kubernetes_cluster_configs]
+repository = "skyslope/kubernetes_cluster_configs"
+ref = "refs/heads/master"
+
+[sources.kubernetes_env_configs]
+repository = "skyslope/kubernetes_env_configs"
+ref = "refs/heads/master"
+
+[sources.mongo_iac]
+repository = "skyslope/mongo-iac"
+ref = "refs/heads/master"
+
+[sources.monitoring_auditor]
+repository = "skyslope/monitoring-auditor"
+ref = "refs/heads/main"
+
+[sources.okta_exporter]
+repository = "skyslope/okta-exporter"
+ref = "refs/heads/main"
+
+[sources.ops]
+repository = "skyslope/ops"
+ref = "refs/heads/master"
+
+[sources.pingdom_exporter]
+repository = "skyslope/pingdom-exporter"
+ref = "refs/heads/main"
+
+[sources.pingdom_metrics]
+repository = "skyslope/pingdom-metrics"
+ref = "refs/heads/master"
+
+[sources.release_management]
+repository = "skyslope/release-management"
+ref = "refs/heads/master"
+
+[sources.rootoptimus]
+repository = "skyslope/rootoptimus"
+ref = "refs/heads/main"
+
+[sources.rootoptimus_mapper]
+repository = "skyslope/rootoptimus-mapper"
+ref = "refs/heads/main"
+
+[sources.security_deployments]
+repository = "skyslope/security-deployments"
+ref = "refs/heads/master"
+
+[sources.service_runbooks]
+repository = "skyslope/service-runbooks"
+ref = "refs/heads/main"
+
+[sources.shared_services_aws]
+repository = "skyslope/shared-services-aws"
+ref = "refs/heads/master"
+
+[sources.shared_services_deployments]
+repository = "skyslope/shared-services-deployments"
+ref = "refs/heads/main"
+
+[sources.skyslope_aws]
+repository = "skyslope/skyslope-aws"
+ref = "refs/heads/master"
+
+[sources.skyslope_deployments]
+repository = "skyslope/skyslope-deployments"
+ref = "refs/heads/master"
+
+[sources.skyslope_network]
+repository = "skyslope/skyslope-network"
+ref = "refs/heads/master"
+
+[sources.slo_exporter]
+repository = "skyslope/slo-exporter"
+ref = "refs/heads/main"
+
+[sources.sre_api]
+repository = "skyslope/sre-api"
+ref = "refs/heads/master"
+
+[sources.sre_appfarm]
+repository = "skyslope/sre-appfarm"
+ref = "refs/heads/master"
+
+[sources.sre_demoapp]
+repository = "skyslope/sre-demoapp"
+ref = "refs/heads/master"
+
+[sources.sre_deployments]
+repository = "skyslope/sre-deployments"
+ref = "refs/heads/master"
+
+[sources.sre_exporters]
+repository = "skyslope/sre-exporters"
+ref = "refs/heads/master"
+
+[sources.sre_utils]
+repository = "skyslope/sre-utils"
+ref = "refs/heads/master"
+
+[sources.srelab_traefik_portainer]
+repository = "skyslope/srelab-traefik-portainer"
+ref = "refs/heads/master"
+
+[sources.ss_helm_charts]
+repository = "skyslope/ss-helm-charts"
+ref = "refs/heads/master"
+
+[sources.ss_helmfiles]
+repository = "skyslope/ss-helmfiles"
+ref = "refs/heads/master"
+
+[sources.terraform]
+repository = "skyslope/terraform"
+ref = "refs/heads/master"
+
+[sources.tf_base]
+repository = "skyslope/tf-base"
+ref = "refs/heads/master"
+
+[sources.vault_iac]
+repository = "skyslope/vault-iac"
+ref = "refs/heads/main"
+
+[sources.workflows_git_trigger]
+repository = "skyslope/workflows-git-trigger"
+ref = "refs/heads/master"
